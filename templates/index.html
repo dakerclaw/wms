@@ -1,1 +1,506 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>物料管理系统</title>
+<link rel="stylesheet" href="/static/css/style.css">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+</head>
+<body>
 
+<!-- Toast 提示 -->
+<div class="toast" id="toast"></div>
+
+<!-- 顶部导航（登录后显示） -->
+<div class="navbar" id="navbar" style="display:none;">
+  <div class="logo">📦 物料管理系统</div>
+  <div class="user-info">
+    <span id="nav-username"></span>
+    <button class="logout-btn" onclick="logout()">退出登录</button>
+  </div>
+</div>
+
+<!-- ==================== 登录页 ==================== -->
+<div class="page active" id="page-login">
+  <div class="login-wrap">
+    <div class="login-box">
+      <h1>📦 物料管理系统</h1>
+      <p class="subtitle">仓储物料入出库管理平台</p>
+      <!-- 登录表单 -->
+      <div id="login-form-wrap">
+        <div class="form-group">
+          <label>用户名</label>
+          <input type="text" class="form-control no-uppercase" id="login-username" placeholder="请输入用户名" autocomplete="username">
+        </div>
+        <div class="form-group">
+          <label>密码</label>
+          <input type="password" class="form-control" id="login-password" placeholder="请输入密码" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()">
+        </div>
+        <button class="btn btn-primary btn-block" style="margin-top:8px;" onclick="doLogin()">登 录</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 主菜单 ==================== -->
+<div class="page" id="page-menu">
+  <div class="menu-wrap">
+    <h2>请选择功能</h2>
+    <div class="menu-grid">
+      <div class="menu-card" onclick="showPage('page-inbound')">
+        <div class="icon">📥</div>
+        <h3>物料入库</h3>
+        <p>录入物料批次信息，生成入库单</p>
+      </div>
+      <div class="menu-card" onclick="showPage('page-inbound-query')">
+        <div class="icon">🔍</div>
+        <h3>入库查询</h3>
+        <p>按时间、厂区、批号查询入库记录</p>
+      </div>
+      <div class="menu-card" onclick="showPage('page-outbound')">
+        <div class="icon">📤</div>
+        <h3>物料出库</h3>
+        <p>录入出库物料，生成出库单</p>
+      </div>
+      <div class="menu-card" onclick="showPage('page-outbound-query')">
+        <div class="icon">🔎</div>
+        <h3>出库查询</h3>
+        <p>按时间、厂区、车次、批号查询出库记录</p>
+      </div>
+    </div>
+    <!-- 管理员专属 -->
+    <div id="admin-menu-card" style="display:none;margin-top:24px;">
+      <div class="menu-card" style="border:2px dashed #fa8c16;" onclick="showPage('page-user-manage')">
+        <div class="icon">👤</div>
+        <h3>账号管理</h3>
+        <p>新增、修改、删除系统账号（管理员）</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 物料入库 ==================== -->
+<div class="page" id="page-inbound">
+  <div class="content-wrap">
+    <div class="page-header">
+      <button class="back-btn" onclick="showPage('page-menu')">←</button>
+      <h2>物料入库</h2>
+    </div>
+    <div class="card">
+      <div class="card-title">基本信息</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>厂区 <span style="color:red">*</span></label>
+          <select class="form-control" id="ib-factory">
+            <option value="">请选择厂区</option>
+            <option value="3号厂房">3号厂房</option>
+            <option value="10号厂房">10号厂房</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">物料信息录入</div>
+      <div class="entry-table-wrap">
+        <table class="entry-table" id="ib-table">
+          <thead>
+            <tr>
+              <th style="width:48px;text-align:center;">序号</th>
+              <th>物料批号</th>
+              <th>设备</th>
+              <th>包号</th>
+              <th>质量（kg）</th>
+              <th style="width:60px;">操作</th>
+            </tr>
+          </thead>
+          <tbody id="ib-tbody"></tbody>
+        </table>
+      </div>
+      <div class="table-actions">
+        <button class="btn btn-default btn-sm" onclick="addIbRow()">＋ 添加一行</button>
+      </div>
+    </div>
+    <div class="page-bottom-actions" style="display:flex;justify-content:flex-end;gap:12px;margin-top:4px;">
+      <button class="btn btn-default" onclick="showPage('page-menu')">取消</button>
+      <button class="btn btn-primary" onclick="previewInbound()">确认入库 →</button>
+    </div>
+  </div>
+</div>
+
+<!-- 入库二次确认弹窗 -->
+<div class="confirm-overlay" id="ib-confirm-overlay">
+  <div class="confirm-modal">
+    <h3>📋 入库清单确认</h3>
+    <p class="order-no">入库单号：<span id="ib-order-no-preview"></span></p>
+    <div class="meta-info" style="margin-bottom:16px;font-size:14px;color:#555;display:flex;gap:16px;flex-wrap:wrap;">
+      <span>厂区：<strong id="ib-confirm-factory"></strong></span>
+      <span>设备：<strong id="ib-confirm-line"></strong></span>
+    </div>
+    <div class="result-table-wrap">
+      <table class="result-table">
+        <thead>
+          <tr><th>序号</th><th>清单包号</th><th>重量（kg）</th></tr>
+        </thead>
+        <tbody id="ib-confirm-tbody"></tbody>
+      </table>
+    </div>
+    <div class="confirm-summary">
+      <span>共计 <strong id="ib-confirm-total">0</strong> 包，总重量 <strong id="ib-confirm-weight">0</strong> kg</span>
+    </div>
+    <div class="modal-actions" style="display:flex;justify-content:flex-end;gap:12px;margin-top:24px;">
+      <button class="btn btn-default" onclick="closeIbConfirm()">← 返回修改</button>
+      <button class="btn btn-success" onclick="submitInbound()">✔ 确认入库</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 入库查询 ==================== -->
+<div class="page" id="page-inbound-query">
+  <div class="content-wrap">
+    <div class="page-header">
+      <button class="back-btn" onclick="showPage('page-menu')">←</button>
+      <h2>入库查询</h2>
+    </div>
+    <div class="card">
+      <div class="card-title">查询条件</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>开始时间</label>
+          <input type="datetime-local" class="form-control" id="iq-start">
+        </div>
+        <div class="form-group">
+          <label>结束时间</label>
+          <input type="datetime-local" class="form-control" id="iq-end">
+        </div>
+        <div class="form-group">
+          <label>厂区</label>
+          <select class="form-control" id="iq-factory">
+            <option value="">全部</option>
+            <option value="3号厂房">3号厂房</option>
+            <option value="10号厂房">10号厂房</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>设备</label>
+          <input type="text" class="form-control" id="iq-line" placeholder="模糊搜索">
+        </div>
+        <div class="form-group">
+          <label>物料批号</label>
+          <input type="text" class="form-control" id="iq-batch" placeholder="模糊搜索">
+        </div>
+      </div>
+      <div class="query-actions" style="display:flex;justify-content:flex-end;margin-top:4px;gap:8px;">
+        <button class="btn btn-primary" onclick="queryInbound()">🔍 查询</button>
+        <button class="btn btn-success" onclick="exportInbound()">📥 导出Excel</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">查询结果 <span id="iq-count" style="font-size:13px;font-weight:normal;color:#888;"></span></div>
+      <div class="result-table-wrap">
+        <table class="result-table">
+          <thead>
+            <tr>
+              <th class="pc-only">入库单号</th>
+              <th class="pc-only">入库时间</th>
+              <th class="pc-only">厂区</th>
+              <th class="pc-only">设备</th>
+              <th>序号</th>
+              <th>清单包号</th>
+              <th>重量（kg）</th>
+              <th class="pc-only">操作员</th>
+            </tr>
+          </thead>
+          <tbody id="iq-tbody">
+            <tr><td colspan="8" class="no-data">请输入条件后点击查询</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 物料出库 ==================== -->
+<div class="page" id="page-outbound">
+  <div class="content-wrap">
+    <div class="page-header">
+      <button class="back-btn" onclick="showPage('page-menu')">←</button>
+      <h2>物料出库</h2>
+    </div>
+    <div class="card">
+      <div class="card-title">基本信息</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>厂区 <span style="color:red">*</span></label>
+          <select class="form-control" id="ob-factory">
+            <option value="">请选择厂区</option>
+            <option value="3号厂房">3号厂房</option>
+            <option value="10号厂房">10号厂房</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>车次 <span style="color:red">*</span></label>
+          <input type="text" class="form-control" id="ob-trip" placeholder="请输入车次">
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">出库物料录入</div>
+      <div class="entry-table-wrap">
+        <table class="entry-table" id="ob-table">
+          <thead>
+            <tr>
+              <th style="width:48px;text-align:center;">序号</th>
+              <th>物料批号</th>
+              <th>设备</th>
+              <th>包号</th>
+              <th>质量（kg）</th>
+              <th style="width:60px;">操作</th>
+            </tr>
+          </thead>
+          <tbody id="ob-tbody"></tbody>
+        </table>
+      </div>
+      <div class="table-actions">
+        <button class="btn btn-default btn-sm" onclick="addObRow()">＋ 添加一行</button>
+      </div>
+    </div>
+    <div class="page-bottom-actions" style="display:flex;justify-content:flex-end;gap:12px;margin-top:4px;">
+      <button class="btn btn-default" onclick="showPage('page-menu')">取消</button>
+      <button class="btn btn-primary" onclick="previewOutbound()">确认出库 →</button>
+    </div>
+  </div>
+</div>
+
+<!-- 出库二次确认弹窗 -->
+<div class="confirm-overlay" id="ob-confirm-overlay">
+  <div class="confirm-modal">
+    <h3>📋 出库清单确认</h3>
+    <p class="order-no">出库单号：<span id="ob-order-no-preview"></span></p>
+    <div class="meta-info" style="margin-bottom:16px;font-size:14px;color:#555;display:flex;gap:16px;flex-wrap:wrap;">
+      <span>厂区：<strong id="ob-confirm-factory"></strong></span>
+      <span>车次：<strong id="ob-confirm-trip"></strong></span>
+    </div>
+    <div class="result-table-wrap">
+      <table class="result-table">
+        <thead>
+          <tr><th>序号</th><th>清单包号</th><th>重量（kg）</th></tr>
+        </thead>
+        <tbody id="ob-confirm-tbody"></tbody>
+      </table>
+    </div>
+    <div class="confirm-summary">
+      <span>共计 <strong id="ob-confirm-total">0</strong> 包，总重量 <strong id="ob-confirm-weight">0</strong> kg</span>
+    </div>
+    <div class="modal-actions" style="display:flex;justify-content:flex-end;gap:12px;margin-top:24px;">
+      <button class="btn btn-default" onclick="closeObConfirm()">← 返回修改</button>
+      <button class="btn btn-success" onclick="submitOutbound()">✔ 确认出库</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 出库查询 ==================== -->
+<div class="page" id="page-outbound-query">
+  <div class="content-wrap">
+    <div class="page-header">
+      <button class="back-btn" onclick="showPage('page-menu')">←</button>
+      <h2>出库查询</h2>
+    </div>
+    <div class="card">
+      <div class="card-title">查询条件</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>日期</label>
+          <input type="date" class="form-control" id="oq-date">
+        </div>
+        <div class="form-group">
+          <label>厂区</label>
+          <select class="form-control" id="oq-factory">
+            <option value="">全部</option>
+            <option value="3号厂房">3号厂房</option>
+            <option value="10号厂房">10号厂房</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>车次</label>
+          <input type="text" class="form-control" id="oq-trip" placeholder="模糊搜索">
+        </div>
+        <div class="form-group">
+          <label>物料批号</label>
+          <input type="text" class="form-control" id="oq-batch" placeholder="模糊搜索">
+        </div>
+      </div>
+      <div class="query-actions" style="display:flex;justify-content:flex-end;margin-top:4px;gap:8px;">
+        <button class="btn btn-primary" onclick="queryOutbound()">🔍 查询</button>
+        <button class="btn btn-success" onclick="exportOutbound()">📥 导出Excel</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">出库单列表 <span id="oq-count" style="font-size:13px;font-weight:normal;color:#888;"></span></div>
+      <div class="result-table-wrap">
+        <table class="result-table">
+          <thead>
+            <tr>
+              <th>出库单号</th>
+              <th>出库时间</th>
+              <th>厂区</th>
+              <th>车次</th>
+              <th>包数</th>
+              <th>总重量（kg）</th>
+              <th>操作员</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="oq-tbody">
+            <tr><td colspan="8" class="no-data">请输入条件后点击查询</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 出库单详情弹窗 -->
+<div class="confirm-overlay" id="ob-detail-overlay">
+  <div class="confirm-modal" style="width:750px;max-height:80vh;overflow-y:auto;">
+    <h3>📋 出库单详情</h3>
+    <p class="order-no">出库单号：<span id="ob-detail-order-no"></span></p>
+    <div class="meta-info" style="margin-bottom:16px;font-size:14px;color:#555;display:flex;gap:16px;flex-wrap:wrap;">
+      <span>厂区：<strong id="ob-detail-factory"></strong></span>
+      <span>车次：<strong id="ob-detail-trip"></strong></span>
+      <span>操作员：<strong id="ob-detail-operator"></strong></span>
+      <span>时间：<strong id="ob-detail-time"></strong></span>
+    </div>
+    <div class="confirm-summary">
+      <span>共计 <strong id="ob-detail-total">0</strong> 包，总重量 <strong id="ob-detail-weight">0</strong> kg</span>
+    </div>
+    <div class="result-table-wrap">
+      <table class="result-table">
+        <thead>
+          <tr><th>序号</th><th class="pc-only">物料批号</th><th class="pc-only">设备</th><th class="pc-only">包号</th><th>清单包号</th><th>重量（kg）</th></tr>
+        </thead>
+        <tbody id="ob-detail-tbody"></tbody>
+      </table>
+    </div>
+    <div class="modal-actions" style="display:flex;justify-content:flex-end;gap:12px;margin-top:24px;">
+      <button class="btn btn-success" onclick="exportOutboundDetail()">📥 导出Excel</button>
+      <button class="btn btn-default" onclick="closeObDetail()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 账号管理 ==================== -->
+<div class="page" id="page-user-manage">
+  <div class="content-wrap">
+    <div class="page-header">
+      <button class="back-btn" onclick="showPage('page-menu')">←</button>
+      <h2>账号管理</h2>
+    </div>
+    <div class="card">
+      <div class="card-title">新增账号</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>用户名 <span style="color:red">*</span></label>
+          <input type="text" class="form-control no-uppercase" id="um-username" placeholder="请输入用户名">
+        </div>
+        <div class="form-group">
+          <label>密码 <span style="color:red">*</span></label>
+          <input type="password" class="form-control" id="um-password" placeholder="请输入密码">
+        </div>
+        <div class="form-group">
+          <label>角色</label>
+          <select class="form-control" id="um-role">
+            <option value="user">普通用户</option>
+            <option value="admin">管理员</option>
+          </select>
+        </div>
+        <div class="form-group" style="display:flex;align-items:flex-end;">
+          <button class="btn btn-success" style="width:100%;" onclick="addUser()">＋ 新增</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title" style="display:flex;align-items:center;justify-content:space-between;">
+        <span>账号列表</span>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-success btn-sm" onclick="exportUsers()">📤 导出账号</button>
+          <button class="btn btn-primary btn-sm" onclick="openImportUsers()">📥 导入账号</button>
+        </div>
+      </div>
+      <div class="result-table-wrap">
+        <table class="result-table">
+          <thead>
+            <tr><th>ID</th><th>用户名</th><th>角色</th><th>创建时间</th><th>操作</th></tr>
+          </thead>
+          <tbody id="um-tbody">
+            <tr><td colspan="5" class="no-data">加载中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 修改账号弹窗 -->
+<div class="confirm-overlay" id="edit-user-overlay">
+  <div class="confirm-modal" style="width:380px;">
+    <h3>修改账号</h3>
+    <div style="margin-top:20px;">
+      <input type="hidden" id="edit-uid">
+      <div class="form-group">
+        <label>用户名</label>
+        <input type="text" class="form-control" id="edit-uname" readonly style="background:#f5f5f5;">
+      </div>
+      <div class="form-group">
+        <label>新密码（留空不修改）</label>
+        <input type="password" class="form-control" id="edit-pwd" placeholder="留空则不修改密码">
+      </div>
+      <div class="form-group">
+        <label>角色</label>
+        <select class="form-control" id="edit-role">
+          <option value="user">普通用户</option>
+          <option value="admin">管理员</option>
+        </select>
+      </div>
+      <div class="modal-actions" style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
+        <button class="btn btn-default" onclick="closeEditUser()">取消</button>
+        <button class="btn btn-primary" onclick="saveEditUser()">保存</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 通用确认弹窗 -->
+<div class="confirm-overlay" id="generic-confirm-overlay">
+  <div class="confirm-modal" style="width:380px;">
+    <h3 id="generic-confirm-title">确认操作</h3>
+    <p id="generic-confirm-msg" style="margin-top:12px;font-size:14px;color:#555;line-height:1.6;"></p>
+    <div class="modal-actions" style="display:flex;gap:12px;margin-top:24px;justify-content:flex-end;">
+      <button class="btn btn-default" onclick="closeGenericConfirm()">取消</button>
+      <button class="btn btn-danger" id="generic-confirm-ok" onclick="">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- 导入账号弹窗 -->
+<div class="confirm-overlay" id="import-users-overlay">
+  <div class="confirm-modal" style="width:420px;">
+    <h3>导入账号</h3>
+    <p style="margin-top:12px;font-size:13px;color:#888;line-height:1.6;">
+      请上传 CSV 文件，格式：用户名, 密码(明文), 角色<br>
+      第一行为表头，会自动跳过；已存在的用户名将自动跳过。<br>
+      密码请填写明文，导入时系统会自动进行 MD5 加密。
+    </p>
+    <div style="margin-top:16px;">
+      <input type="file" id="import-users-file" accept=".csv" style="font-size:14px;">
+    </div>
+    <div class="modal-actions" style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
+      <button class="btn btn-default" onclick="closeImportUsers()">取消</button>
+      <button class="btn btn-primary" onclick="doImportUsers()">开始导入</button>
+    </div>
+  </div>
+</div>
+
+<script src="/static/js/app.js"></script>
+</body>
+</html>
