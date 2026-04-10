@@ -7,8 +7,11 @@ import datetime
 import json
 import csv
 import io
+import shutil
+import glob
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+BACKUP_DIR = os.path.join(BASE_DIR, 'backup')
 app = Flask(__name__)
 app.secret_key = 'wms_secret_key_2026'
 CORS(app, resources={r"/api/*": {"origins": "*"}})
@@ -427,6 +430,156 @@ def query_outbound():
         return jsonify({'code': 200, 'data': [dict(r) for r in rows]})
     finally:
         conn.close()
+
+
+# ===== 数据清理（管理员） =====
+@app.route('/api/records/preview', methods=['GET'])
+@require_admin
+def preview_delete_records():
+    """预览将要删除的记录数量"""
+    before_date = request.args.get('before_date', '')
+    if not before_date:
+        return jsonify({'code': 400, 'msg': '请选择日期'})
+    conn = get_db()
+    try:
+        ib_count = conn.execute(
+            "SELECT COUNT(*) FROM inbound_orders WHERE created_at < ?", (before_date,)
+        ).fetchone()[0]
+        ob_count = conn.execute(
+            "SELECT COUNT(*) FROM outbound_orders WHERE created_at < ?", (before_date,)
+        ).fetchone()[0]
+        return jsonify({'code': 200, 'inbound': ib_count, 'outbound': ob_count})
+    finally:
+        conn.close()
+
+
+@app.route('/api/records/delete', methods=['POST'])
+@require_admin
+def delete_records():
+    """删除指定日期之前的入库出库记录"""
+    data = request.json
+    if not data:
+        return jsonify({'code': 400, 'msg': '请求格式错误'})
+    before_date = data.get('before_date', '')
+    if not before_date:
+        return jsonify({'code': 400, 'msg': '请选择日期'})
+    conn = get_db()
+    try:
+        # 先查数量
+        ib_count = conn.execute(
+            "SELECT COUNT(*) FROM inbound_orders WHERE created_at < ?", (before_date,)
+        ).fetchone()[0]
+        ob_count = conn.execute(
+            "SELECT COUNT(*) FROM outbound_orders WHERE created_at < ?", (before_date,)
+        ).fetchone()[0]
+        # 删除明细（先删子表）
+        conn.execute(
+            "DELETE FROM inbound_items WHERE order_no IN "
+            "(SELECT order_no FROM inbound_orders WHERE created_at < ?)", (before_date,)
+        )
+        conn.execute(
+            "DELETE FROM inbound_orders WHERE created_at < ?", (before_date,)
+        )
+        conn.execute(
+            "DELETE FROM outbound_items WHERE order_no IN "
+            "(SELECT order_no FROM outbound_orders WHERE created_at < ?)", (before_date,)
+        )
+        conn.execute(
+            "DELETE FROM outbound_orders WHERE created_at < ?", (before_date,)
+        )
+        conn.commit()
+        return jsonify({
+            'code': 200,
+            'msg': f'删除成功：入库单 {ib_count} 条，出库单 {ob_count} 条',
+            'inbound': ib_count,
+            'outbound': ob_count
+        })
+    finally:
+        conn.close()
+
+
+# ===== 数据库备份管理（管理员） =====
+
+def _ensure_backup_dir():
+    os.makedirs(BACKUP_DIR, exist_ok=True)
+
+
+@app.route('/api/backup/create', methods=['POST'])
+@require_admin
+def create_backup():
+    """立即创建一次数据库备份"""
+    _ensure_backup_dir()
+    ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    filename = f'wms_{ts}.db'
+    dest = os.path.join(BACKUP_DIR, filename)
+    try:
+        shutil.copy2(DB_PATH, dest)
+        size = os.path.getsize(dest)
+        return jsonify({
+            'code': 200,
+            'msg': f'备份成功：{filename}',
+            'filename': filename,
+            'size': size,
+            'created_at': ts[:8]  # YYYYMMDD
+        })
+    except Exception as e:
+        return jsonify({'code': 500, 'msg': f'备份失败：{str(e)}'})
+
+
+@app.route('/api/backup/list', methods=['GET'])
+@require_admin
+def list_backups():
+    """获取所有备份文件列表"""
+    _ensure_backup_dir()
+    files = sorted(glob.glob(os.path.join(BACKUP_DIR, 'wms_*.db')), reverse=True)
+    result = []
+    for f in files:
+        name = os.path.basename(f)
+        size = os.path.getsize(f)
+        # 从文件名解析日期 wms_YYYYMMDD_HHMMSS.db
+        try:
+            date_part = name[4:12]   # YYYYMMDD
+            time_part = name[13:19]  # HHMMSS
+            display = f"{date_part[:4]}-{date_part[4:6]}-{date_part[6:8]} {time_part[:2]}:{time_part[2:4]}:{time_part[4:6]}"
+        except Exception:
+            display = name
+        result.append({
+            'filename': name,
+            'display': display,
+            'date': date_part if len(name) >= 12 else '',
+            'size': size
+        })
+    return jsonify({'code': 200, 'data': result})
+
+
+@app.route('/api/backup/delete', methods=['POST'])
+@require_admin
+def delete_backups():
+    """删除指定日期之前的备份文件"""
+    data = request.json
+    if not data:
+        return jsonify({'code': 400, 'msg': '请求格式错误'})
+    before_date = data.get('before_date', '')  # YYYY-MM-DD
+    if not before_date:
+        return jsonify({'code': 400, 'msg': '请选择日期'})
+    # 转为 YYYYMMDD 格式方便比较
+    cutoff = before_date.replace('-', '')
+    _ensure_backup_dir()
+    files = glob.glob(os.path.join(BACKUP_DIR, 'wms_*.db'))
+    deleted = 0
+    errors = []
+    for f in files:
+        name = os.path.basename(f)
+        try:
+            file_date = name[4:12]  # YYYYMMDD
+            if file_date < cutoff:
+                os.remove(f)
+                deleted += 1
+        except Exception as e:
+            errors.append(str(e))
+    if errors:
+        return jsonify({'code': 500, 'msg': f'部分删除失败：{errors[0]}', 'deleted': deleted})
+    return jsonify({'code': 200, 'msg': f'已删除 {deleted} 个备份文件', 'deleted': deleted})
 
 
 if __name__ == '__main__':

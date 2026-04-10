@@ -1,4 +1,4 @@
-# WMS 物料出入库管理系统
+# WMS 物料管理系统 — Debian 服务器部署指南
 
 > 仓库地址：`https://github.com/dakerclaw/wms`
 
