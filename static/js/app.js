@@ -642,6 +642,222 @@ function closeGenericConfirm() {
   genericConfirmCallback = null;
 }
 
+// ===================== 数据清理 =====================
+function openCleanModal() {
+  // 重置弹窗状态
+  document.getElementById('clean-date').value = '';
+  document.getElementById('clean-preview').style.display = 'none';
+  document.getElementById('clean-empty').style.display = 'none';
+  document.getElementById('clean-confirm-btn').style.display = 'none';
+  document.getElementById('clean-overlay').classList.add('show');
+}
+
+function closeCleanModal() {
+  document.getElementById('clean-overlay').classList.remove('show');
+}
+
+async function previewClean() {
+  const date = document.getElementById('clean-date').value;
+  if (!date) { showToast('请先选择日期', 'error'); return; }
+
+  // 隐藏之前的结果
+  document.getElementById('clean-preview').style.display = 'none';
+  document.getElementById('clean-empty').style.display = 'none';
+  document.getElementById('clean-confirm-btn').style.display = 'none';
+
+  try {
+    const res = await fetch(`/api/records/preview?before_date=${encodeURIComponent(date)}`);
+    const data = await res.json();
+    if (data.code !== 200) { showToast(data.msg, 'error'); return; }
+
+    if (data.inbound === 0 && data.outbound === 0) {
+      document.getElementById('clean-empty').style.display = 'block';
+    } else {
+      document.getElementById('clean-ib-count').textContent = data.inbound;
+      document.getElementById('clean-ob-count').textContent = data.outbound;
+      document.getElementById('clean-preview').style.display = 'block';
+      document.getElementById('clean-confirm-btn').style.display = '';
+    }
+  } catch (e) {
+    showToast('请求失败，请重试', 'error');
+  }
+}
+
+async function doClean() {
+  const date = document.getElementById('clean-date').value;
+  if (!date) { showToast('请先选择日期', 'error'); return; }
+
+  const ibCount = document.getElementById('clean-ib-count').textContent;
+  const obCount = document.getElementById('clean-ob-count').textContent;
+
+  // 二次确认
+  if (!confirm(`确认删除 ${date} 之前的记录？\n入库单 ${ibCount} 条，出库单 ${obCount} 条\n\n此操作不可撤销！`)) return;
+
+  try {
+    const res = await fetch('/api/records/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ before_date: date })
+    });
+    const data = await res.json();
+    if (data.code === 200) {
+      showToast(data.msg, 'success');
+      closeCleanModal();
+    } else {
+      showToast(data.msg || '删除失败', 'error');
+    }
+  } catch (e) {
+    showToast('请求失败，请重试', 'error');
+  }
+}
+
+// ===================== 数据库备份管理 =====================
+let backupFilterDate = '';  // 当前查询筛选日期
+
+function openBackupModal() {
+  backupFilterDate = '';
+  document.getElementById('backup-query-date').value = '';
+  document.getElementById('backup-delete-btn').style.display = 'none';
+  document.getElementById('backup-result-tip').style.display = 'none';
+  document.getElementById('backup-list-title').textContent = '现有备份文件';
+  document.getElementById('backup-overlay').classList.add('show');
+  loadBackupList();
+}
+
+function closeBackupModal() {
+  document.getElementById('backup-overlay').classList.remove('show');
+}
+
+function _formatSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1024 / 1024).toFixed(2) + ' MB';
+}
+
+function _renderBackupList(list) {
+  const wrap = document.getElementById('backup-list-wrap');
+  if (!list || list.length === 0) {
+    wrap.innerHTML = '<div style="text-align:center;color:#bbb;padding:24px 0;font-size:13px;">没有匹配的备份文件</div>';
+    return;
+  }
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:13px;">';
+  html += '<thead><tr style="background:#f5f5f5;">' +
+    '<th style="padding:8px 10px;text-align:left;font-weight:600;">文件名</th>' +
+    '<th style="padding:8px 10px;text-align:center;font-weight:600;">备份时间</th>' +
+    '<th style="padding:8px 10px;text-align:right;font-weight:600;">大小</th>' +
+    '</tr></thead><tbody>';
+  list.forEach((f, i) => {
+    const bg = i % 2 === 0 ? '#fff' : '#fafafa';
+    html += '<tr style="background:' + bg + ';">' +
+      '<td style="padding:7px 10px;color:#555;">' + f.filename + '</td>' +
+      '<td style="padding:7px 10px;text-align:center;color:#333;">' + f.display + '</td>' +
+      '<td style="padding:7px 10px;text-align:right;color:#888;">' + _formatSize(f.size) + '</td>' +
+      '</tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+}
+
+async function loadBackupList() {
+  const wrap = document.getElementById('backup-list-wrap');
+  wrap.innerHTML = '<div style="text-align:center;color:#bbb;padding:24px 0;font-size:13px;">加载中…</div>';
+  try {
+    const res = await fetch('/api/backup/list');
+    const data = await res.json();
+    if (data.code !== 200) { wrap.innerHTML = '<div style="color:#ff4d4f;padding:12px;">获取列表失败</div>'; return; }
+    _renderBackupList(data.data);
+  } catch (e) {
+    wrap.innerHTML = '<div style="color:#ff4d4f;padding:12px;">请求失败，请重试</div>';
+  }
+}
+
+async function queryBackupList() {
+  const date = document.getElementById('backup-query-date').value;
+  if (!date) { showToast('请先选择日期', 'error'); return; }
+  backupFilterDate = date;
+
+  const wrap = document.getElementById('backup-list-wrap');
+  const tip = document.getElementById('backup-result-tip');
+  wrap.innerHTML = '<div style="text-align:center;color:#bbb;padding:24px 0;font-size:13px;">查询中…</div>';
+  tip.style.display = 'none';
+  document.getElementById('backup-delete-btn').style.display = 'none';
+
+  try {
+    const res = await fetch('/api/backup/list');
+    const data = await res.json();
+    if (data.code !== 200) { wrap.innerHTML = '<div style="color:#ff4d4f;padding:12px;">查询失败</div>'; return; }
+
+    const cutoff = date.replaceAll('-', '');
+    const filtered = (data.data || []).filter(f => f.date <= cutoff);
+
+    document.getElementById('backup-list-title').textContent = date + ' 之前的备份';
+
+    if (filtered.length === 0) {
+      tip.style.display = 'block';
+      tip.style.background = '#f6ffed';
+      tip.style.border = '1px solid #b7eb8f';
+      tip.innerHTML = '✅ ' + date + ' 之前没有备份文件';
+      document.getElementById('backup-delete-btn').style.display = 'none';
+    } else {
+      tip.style.display = 'block';
+      tip.style.background = '#fff7e6';
+      tip.style.border = '1px solid #ffd591';
+      tip.innerHTML = '查询到 <strong>' + filtered.length + '</strong> 个备份文件';
+      document.getElementById('backup-delete-btn').style.display = '';
+    }
+    _renderBackupList(filtered);
+  } catch (e) {
+    wrap.innerHTML = '<div style="color:#ff4d4f;padding:12px;">请求失败，请重试</div>';
+  }
+}
+
+async function doCreateBackup() {
+  const btn = document.getElementById('backup-create-btn');
+  btn.disabled = true;
+  btn.textContent = '备份中…';
+  try {
+    const res = await fetch('/api/backup/create', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+    const data = await res.json();
+    if (data.code === 200) {
+      showToast(data.msg, 'success');
+      // 如果当前有查询筛选，刷新查询结果；否则刷新全部列表
+      if (backupFilterDate) {
+        queryBackupList();
+      } else {
+        loadBackupList();
+      }
+    } else {
+      showToast(data.msg || '备份失败', 'error');
+    }
+  } catch (e) {
+    showToast('请求失败，请重试', 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '立即备份';
+  }
+}
+
+async function doDeleteBackups() {
+  if (!backupFilterDate) { showToast('请先查询备份', 'error'); return; }
+  if (!confirm('确认删除查询结果中的所有备份文件？\n此操作不可撤销！')) return;
+  try {
+    const res = await fetch('/api/backup/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ before_date: backupFilterDate })
+    });
+    const data = await res.json();
+    if (data.code === 200) {
+      showToast(data.msg, 'success');
+      queryBackupList();  // 刷新查询结果
+    } else {
+      showToast(data.msg || '删除失败', 'error');
+    }
+  } catch (e) {
+    showToast('请求失败，请重试', 'error');
+  }
+}
+
 // ===================== XSS防护 =====================
 function escHtml(str) {
   if (!str) return '';
