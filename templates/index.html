@@ -71,10 +71,22 @@
     </div>
     <!-- 管理员专属 -->
     <div id="admin-menu-card" style="display:none;margin-top:24px;">
-      <div class="menu-card" style="border:2px dashed #fa8c16;" onclick="showPage('page-user-manage')">
-        <div class="icon">👤</div>
-        <h3>账号管理</h3>
-        <p>新增、修改、删除系统账号（管理员）</p>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;">
+        <div class="menu-card" style="border:2px dashed #fa8c16;" onclick="showPage('page-user-manage')">
+          <div class="icon">👤</div>
+          <h3>账号管理</h3>
+          <p>新增、修改、删除系统账号（管理员）</p>
+        </div>
+        <div class="menu-card" style="border:2px dashed #ff4d4f;" onclick="openCleanModal()">
+          <div class="icon">🗑️</div>
+          <h3>数据清理</h3>
+          <p>删除指定日期之前的入库出库记录</p>
+        </div>
+        <div class="menu-card" style="border:2px dashed #1677ff;" onclick="openBackupModal()">
+          <div class="icon">💾</div>
+          <h3>数据库备份</h3>
+          <p>手动备份数据库 / 删除旧备份文件</p>
+        </div>
       </div>
     </div>
   </div>
@@ -497,6 +509,65 @@
     <div class="modal-actions" style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
       <button class="btn btn-default" onclick="closeImportUsers()">取消</button>
       <button class="btn btn-primary" onclick="doImportUsers()">开始导入</button>
+    </div>
+  </div>
+</div>
+
+<!-- 数据清理弹窗 -->
+<div class="confirm-overlay" id="clean-overlay">
+  <div class="confirm-modal" style="width:420px;">
+    <h3>🗑️ 数据清理</h3>
+    <p style="margin-top:12px;font-size:13px;color:#888;line-height:1.8;">
+      删除所选日期<strong>之前</strong>（不含当天）的所有入库和出库记录。<br>
+      此操作<strong style="color:#ff4d4f;">不可撤销</strong>，请谨慎操作。
+    </p>
+    <div class="form-group" style="margin-top:16px;">
+      <label>删除此日期之前的记录</label>
+      <input type="date" class="form-control" id="clean-date">
+    </div>
+    <!-- 预览区 -->
+    <div id="clean-preview" style="display:none;margin-top:12px;padding:12px 16px;background:#fff7e6;border:1px solid #ffd591;border-radius:6px;font-size:13px;line-height:1.8;">
+      将删除：入库单 <strong id="clean-ib-count">0</strong> 条，出库单 <strong id="clean-ob-count">0</strong> 条
+    </div>
+    <div id="clean-empty" style="display:none;margin-top:12px;padding:12px 16px;background:#f6ffed;border:1px solid #b7eb8f;border-radius:6px;font-size:13px;">
+      ✅ 该日期之前没有需要删除的记录
+    </div>
+    <div class="modal-actions" style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
+      <button class="btn btn-default" onclick="closeCleanModal()">取消</button>
+      <button class="btn btn-default" onclick="previewClean()">预览数量</button>
+      <button class="btn btn-danger" id="clean-confirm-btn" style="display:none;" onclick="doClean()">确认删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- 数据库备份管理弹窗 -->
+<div class="confirm-overlay" id="backup-overlay">
+  <div class="confirm-modal" style="width:520px;max-height:90vh;overflow-y:auto;">
+    <h3>💾 数据库备份</h3>
+
+    <!-- 操作区 -->
+    <div style="display:flex;gap:10px;align-items:center;margin-top:16px;flex-wrap:wrap;">
+      <button class="btn btn-primary" onclick="doCreateBackup()" id="backup-create-btn">立即备份</button>
+    </div>
+    <div style="display:flex;gap:10px;align-items:center;margin-top:10px;flex-wrap:wrap;">
+      <span style="font-size:13px;color:#888;white-space:nowrap;">查询此日期及之前的备份：</span>
+      <input type="date" class="form-control" id="backup-query-date">
+      <button class="btn btn-default" onclick="queryBackupList()">查询</button>
+      <button class="btn btn-danger" id="backup-delete-btn" style="display:none;" onclick="doDeleteBackups()">删除查询结果</button>
+    </div>
+    <!-- 查询结果提示 -->
+    <div id="backup-result-tip" style="display:none;margin-top:10px;padding:10px 16px;border-radius:6px;font-size:13px;"></div>
+
+    <!-- 备份列表 -->
+    <div style="margin-top:16px;">
+      <div style="font-size:13px;font-weight:600;color:#444;margin-bottom:8px;" id="backup-list-title">现有备份文件</div>
+      <div id="backup-list-wrap">
+        <div style="text-align:center;color:#bbb;padding:24px 0;font-size:13px;">加载中…</div>
+      </div>
+    </div>
+
+    <div class="modal-actions" style="margin-top:16px;justify-content:flex-end;display:flex;">
+      <button class="btn btn-default" onclick="closeBackupModal()">关闭</button>
     </div>
   </div>
 </div>
