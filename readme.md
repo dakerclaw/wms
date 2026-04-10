@@ -11,7 +11,7 @@
 
 # 版本一：普通用户部署（推荐）
 
-> 以下步骤以**普通用户**（如 `mymac`）登录服务器执行，仅在需要系统级操作时使用 `sudo`。
+> 以下步骤以**普通用户**（如 `mac`）登录服务器执行，仅在需要系统级操作时使用 `sudo`。
 
 ## 一、全新安装
 
@@ -66,7 +66,7 @@ EOF
 ### 6. 配置 Supervisor（进程守护）
 
 ```bash
-sudo tee /etc/supervisor/conf.d/wms.conf > /dev/null <<'EOF'
+sudo tee /etc/supervisor/conf.d/wms.conf > /dev/null <<EOF
 [program:wms]
 directory=/opt/wms
 command=/opt/wms/venv/bin/gunicorn -c gunicorn.conf.py app:app
@@ -84,7 +84,7 @@ sudo supervisorctl status wms
 
 应显示 `RUNNING`。
 
-> **注意**：`user=$USER` 会被 shell 替换为当前用户名（如 `mac`）。确保替换结果正确，也可以直接写 `user=mac`。
+> **注意**：`<<EOF`（不加引号）才能让 shell 替换 `$USER`。如果替换失败，请直接将 `user=$USER` 改为你的用户名（如 `user=mac`）。
 
 ### 7. 防火墙放行
 
