@@ -44,6 +44,7 @@ def init_db():
         order_no TEXT UNIQUE NOT NULL,
         factory TEXT NOT NULL,
         equipment TEXT NOT NULL,
+        package_type TEXT NOT NULL DEFAULT '标包',
         operator TEXT NOT NULL,
         created_at TEXT DEFAULT (datetime('now','localtime'))
     )''')
@@ -87,6 +88,10 @@ def init_db():
         cols = [row[1] for row in conn.execute(f"PRAGMA table_info({table})").fetchall()]
         if 'production_line' in cols and 'equipment' not in cols:
             conn.execute(f"ALTER TABLE {table} RENAME COLUMN production_line TO equipment")
+    # 兼容旧数据库：inbound_orders 增加 package_type 字段
+    cols = [row[1] for row in conn.execute("PRAGMA table_info(inbound_orders)").fetchall()]
+    if 'package_type' not in cols:
+        conn.execute("ALTER TABLE inbound_orders ADD COLUMN package_type TEXT NOT NULL DEFAULT '标包'")
     conn.commit()
 
     # 初始化管理员账号
@@ -122,8 +127,9 @@ def require_login(f):
 def require_admin(f):
     from functools import wraps
     @wraps(f)
-    @require_login
     def decorated(*args, **kwargs):
+        if 'user' not in session:
+            return jsonify({'code': 401, 'msg': '未登录'}), 401
         if session.get('role') != 'admin':
             return jsonify({'code': 403, 'msg': '无权限'}), 403
         return f(*args, **kwargs)
@@ -298,6 +304,85 @@ def import_users():
         conn.close()
 
 
+# ===== 概览 =====
+@app.route('/api/overview', methods=['GET'])
+@require_admin
+def overview():
+    now = datetime.datetime.now()
+    # 今日早8点
+    today_8 = now.replace(hour=8, minute=0, second=0, microsecond=0)
+    # 昨日早8点
+    yesterday_8 = today_8 - datetime.timedelta(days=1)
+    ib_start = yesterday_8.strftime('%Y-%m-%d %H:%M:%S')
+    ib_end = today_8.strftime('%Y-%m-%d %H:%M:%S')
+    # 出库统计：今日自然日 00:00 ~ 现在（与出库查询日期逻辑一致）
+    ob_date = now.strftime('%Y-%m-%d')
+    ob_start = ob_date + ' 00:00:00'
+    ob_end = ob_date + ' 23:59:59'
+
+    conn = get_db()
+    try:
+        # 入库：按设备、物料批号汇总包数和总质量
+        ib_rows = conn.execute("""
+            SELECT ii.equipment, ii.batch_no,
+                   COUNT(*) as pkg_count,
+                   ROUND(SUM(ii.weight), 2) as total_weight
+            FROM inbound_items ii
+            JOIN inbound_orders io ON ii.order_no = io.order_no
+            WHERE io.created_at >= ? AND io.created_at < ?
+            GROUP BY ii.equipment, ii.batch_no
+            ORDER BY ii.equipment, ii.batch_no
+        """, (ib_start, ib_end)).fetchall()
+
+        # 入库汇总合计
+        ib_total = conn.execute("""
+            SELECT COUNT(*) as pkg_count, ROUND(SUM(ii.weight), 2) as total_weight
+            FROM inbound_items ii
+            JOIN inbound_orders io ON ii.order_no = io.order_no
+            WHERE io.created_at >= ? AND io.created_at < ?
+        """, (ib_start, ib_end)).fetchone()
+
+        # 出库：按厂区、车次汇总包数和总质量
+        ob_rows = conn.execute("""
+            SELECT oo.factory, oo.trip,
+                   COUNT(*) as pkg_count,
+                   ROUND(SUM(oi.weight), 2) as total_weight
+            FROM outbound_items oi
+            JOIN outbound_orders oo ON oi.order_no = oo.order_no
+            WHERE oo.created_at >= ? AND oo.created_at <= ?
+            GROUP BY oo.factory, oo.trip
+            ORDER BY oo.factory, oo.trip
+        """, (ob_start, ob_end)).fetchall()
+
+        # 出库汇总合计（车次数、总包数、总质量）
+        ob_total = conn.execute("""
+            SELECT COUNT(DISTINCT oo.order_no) as trip_count,
+                   COUNT(*) as pkg_count,
+                   ROUND(SUM(oi.weight), 2) as total_weight
+            FROM outbound_items oi
+            JOIN outbound_orders oo ON oi.order_no = oo.order_no
+            WHERE oo.created_at >= ? AND oo.created_at <= ?
+        """, (ob_start, ob_end)).fetchone()
+
+        return jsonify({
+            'code': 200,
+            'ib_start': ib_start,
+            'ib_end': ib_end,
+            'ob_date': ob_date,
+            'inbound': [dict(r) for r in ib_rows],
+            'ib_total': {'pkg_count': ib_total['pkg_count'] or 0,
+                         'total_weight': ib_total['total_weight'] or 0},
+            'outbound': [dict(r) for r in ob_rows],
+            'ob_total': {'trip_count': ob_total['trip_count'] or 0,
+                         'pkg_count': ob_total['pkg_count'] or 0,
+                         'total_weight': ob_total['total_weight'] or 0}
+        })
+    except Exception as e:
+        return jsonify({'code': 500, 'msg': f'服务器错误: {str(e)}'}), 500
+    finally:
+        conn.close()
+
+
 # ===== 入库 =====
 @app.route('/api/inbound', methods=['POST'])
 @require_login
@@ -307,14 +392,15 @@ def create_inbound():
         return jsonify({'code': 400, 'msg': '请求格式错误'})
     factory = data.get('factory', '')
     equipment = data.get('equipment', '')
+    package_type = data.get('package_type', '标包')
     items = data.get('items', [])
     if not factory or not equipment or not items:
         return jsonify({'code': 400, 'msg': '参数不完整'})
     order_no = gen_order_no('RK')
     conn = get_db()
     try:
-        conn.execute("INSERT INTO inbound_orders (order_no, factory, equipment, operator) VALUES (?,?,?,?)",
-                     (order_no, factory, equipment, session['user']))
+        conn.execute("INSERT INTO inbound_orders (order_no, factory, equipment, package_type, operator) VALUES (?,?,?,?,?)",
+                     (order_no, factory, equipment, package_type, session['user']))
         for idx, item in enumerate(items):
             list_no = f"{item['batch_no']}-{equipment}-{item['package_no']}"
             conn.execute(
@@ -336,7 +422,7 @@ def query_inbound():
     equipment = request.args.get('equipment', '')
     batch_no = request.args.get('batch_no', '')
 
-    sql = '''SELECT o.order_no, o.factory, o.equipment, o.operator, o.created_at,
+    sql = '''SELECT o.order_no, o.factory, o.equipment, o.package_type, o.operator, o.created_at,
                     i.seq, i.batch_no, i.equipment as item_line, i.package_no, i.list_no, i.weight
              FROM inbound_orders o
              JOIN inbound_items i ON o.order_no = i.order_no
