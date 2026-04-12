@@ -88,6 +88,25 @@ body {
 .no-uppercase { text-transform: none !important; }
 select.form-control { appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23666' stroke-width='1.5' fill='none'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
 
+/* ===== Radio 单选组 ===== */
+.radio-group { display: flex; gap: 16px; flex-wrap: wrap; padding-top: 4px; }
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  color: #333;
+  cursor: pointer;
+  padding: 7px 16px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  background: #fff;
+  transition: border-color .2s, background .2s;
+  font-weight: normal;
+}
+.radio-label input[type="radio"] { accent-color: #2d6a9f; width: 15px; height: 15px; cursor: pointer; }
+.radio-label:has(input:checked) { border-color: #2d6a9f; background: #eef4fb; color: #2d6a9f; font-weight: 500; }
+
 /* ===== 按钮 ===== */
 .btn {
   display: inline-flex;
@@ -556,6 +575,52 @@ select.form-control { appearance: none; background-image: url("data:image/svg+xm
 
   /* 账号管理 */
   .tag-admin, .tag-user { font-size: 11px; padding: 1px 6px; }
+}
+
+/* ===== 数据概览 ===== */
+.overview-time-tip {
+  font-size: 13px;
+  color: #666;
+  background: #f0f4fa;
+  border-left: 3px solid #2d6a9f;
+  padding: 8px 14px;
+  border-radius: 0 6px 6px 0;
+  margin-bottom: 16px;
+  line-height: 1.7;
+}
+.overview-stat-row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.overview-stat-card {
+  flex: 1;
+  min-width: 120px;
+  background: #fff;
+  border-radius: 8px;
+  padding: 16px 18px;
+  box-shadow: 0 1px 4px rgba(0,0,0,.08);
+  text-align: center;
+}
+.overview-stat-label {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 8px;
+}
+.overview-stat-num {
+  font-size: 28px;
+  font-weight: 700;
+  color: #1a3a5c;
+  line-height: 1;
+}
+
+/* --- 概览移动端适配 --- */
+@media (max-width: 600px) {
+  .overview-stat-row { gap: 8px; }
+  .overview-stat-card { min-width: calc(50% - 4px); padding: 12px; }
+  .overview-stat-num { font-size: 22px; }
+  .overview-stat-label { font-size: 11px; }
 }
 
 /* --- 超小屏（≤380px） --- */
