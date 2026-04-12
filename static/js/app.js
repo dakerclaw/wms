@@ -231,14 +231,14 @@ function syncCurrentInputs(tbodyId, items) {
   rows.forEach((tr, i) => {
     if (i >= items.length) return;
     const inputs = tr.querySelectorAll('input');
-    inputs.forEach(inp => {
-      const fn = inp.getAttribute('oninput');
-      if (fn) {
-        // 用 Function 执行 oninput 回调中的赋值表达式
-        try { new Function(fn)(); } catch(e) {}
-      }
-    });
+    // 直接按 input 顺序同步到数组对应字段
+    if (inputs[0]) items[i].batch_no = inputs[0].value;
+    if (inputs[1]) items[i].equipment = inputs[1].value;
+    if (inputs[2]) items[i].package_no = inputs[2].value;
+    if (inputs[3]) items[i].weight = parseFloat(inputs[3].value) || 0;
   });
+  console.log('[syncCurrentInputs] 同步完成，数组长度:', items.length,
+    items.length > 0 ? '最后一行: batch=' + items[items.length-1].batch_no + ', eq=' + items[items.length-1].equipment + ', w=' + items[items.length-1].weight : '');
 }
 
 function renderIbTable() {
@@ -288,26 +288,12 @@ function addIbRow() {
     });
   }
 
-  const tbody = document.getElementById('ib-tbody');
-  // 如果 tbody 里只有"暂无数据"提示，先清空
-  if (tbody.querySelector('.no-data')) tbody.innerHTML = '';
-
-  // 只追加新行，不重建整个表格
-  const idx = ibItems.length - 1;
-  const item = ibItems[idx];
-  const tr = document.createElement('tr');
-  tr.innerHTML = `
-    <td class="td-no" data-row="1">${idx + 1}</td>
-    <td data-row="2"><input type="text" value="${escHtml(item.batch_no)}" oninput="ibItems[${idx}].batch_no=this.value" placeholder="物料批号"></td>
-    <td data-row="3"><input type="text" value="${escHtml(item.equipment)}" oninput="ibItems[${idx}].equipment=this.value" placeholder="设备"></td>
-    <td data-row="3"><input type="text" value="${escHtml(item.package_no)}" oninput="ibItems[${idx}].package_no=this.value" placeholder="包号"></td>
-    <td data-row="3"><input type="number" step="0.01" value="${item.weight}" oninput="ibItems[${idx}].weight=parseFloat(this.value)||0" placeholder="质量(kg)"></td>
-    <td data-row="1"><button class="btn btn-danger btn-sm" onclick="removeIbRow(${idx})">删</button></td>
-  `;
-  tbody.appendChild(tr);
+  renderIbTable();
 
   setTimeout(() => {
-    const inputs = tr.querySelectorAll('input');
+    const rows = document.getElementById('ib-tbody').querySelectorAll('tr');
+    const lastRow = rows[rows.length - 1];
+    const inputs = lastRow.querySelectorAll('input');
     if (inputs.length > 0) {
       const focusIdx = pkgType === '非标包' ? 3 : (ibItems.length === 1 ? 0 : 1);
       inputs[Math.min(focusIdx, inputs.length - 1)].focus();
@@ -316,6 +302,7 @@ function addIbRow() {
 }
 
 function removeIbRow(i) {
+  syncCurrentInputs('ib-tbody', ibItems);
   ibItems.splice(i, 1);
   renderIbTable();
 }
@@ -475,7 +462,6 @@ function renderObTable() {
 }
 
 function addObRow() {
-  // 添加行前先同步当前所有 input 的值到数组
   syncCurrentInputs('ob-tbody', obItems);
 
   const last = obItems[obItems.length - 1];
@@ -486,31 +472,19 @@ function addObRow() {
     weight: last ? last.weight : ''
   });
 
-  const tbody = document.getElementById('ob-tbody');
-  if (tbody.querySelector('.no-data')) tbody.innerHTML = '';
-
-  // 只追加新行
-  const idx = obItems.length - 1;
-  const item = obItems[idx];
-  const tr = document.createElement('tr');
-  tr.innerHTML = `
-    <td class="td-no" data-row="1">${idx + 1}</td>
-    <td data-row="2"><input type="text" value="${escHtml(item.batch_no)}" oninput="obItems[${idx}].batch_no=this.value" placeholder="物料批号"></td>
-    <td data-row="3"><input type="text" value="${escHtml(item.equipment)}" oninput="obItems[${idx}].equipment=this.value" placeholder="设备"></td>
-    <td data-row="3"><input type="text" value="${escHtml(item.package_no)}" oninput="obItems[${idx}].package_no=this.value" placeholder="包号"></td>
-    <td data-row="3"><input type="number" step="0.01" value="${item.weight}" oninput="obItems[${idx}].weight=parseFloat(this.value)||0" placeholder="质量(kg)"></td>
-    <td data-row="1"><button class="btn btn-danger btn-sm" onclick="removeObRow(${idx})">删</button></td>
-  `;
-  tbody.appendChild(tr);
+  renderObTable();
 
   setTimeout(() => {
-    const inputs = tr.querySelectorAll('input');
+    const rows = document.getElementById('ob-tbody').querySelectorAll('tr');
+    const lastRow = rows[rows.length - 1];
+    const inputs = lastRow.querySelectorAll('input');
     if (inputs.length > 2) inputs[2].focus();
     else if (inputs.length > 0) inputs[0].focus();
   }, 50);
 }
 
 function removeObRow(i) {
+  syncCurrentInputs('ob-tbody', obItems);
   obItems.splice(i, 1);
   renderObTable();
 }
