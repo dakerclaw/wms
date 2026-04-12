@@ -15,6 +15,7 @@ function showPage(id) {
   if (id === 'page-outbound') initObPage();
   if (id === 'page-inbound-query') initIbQueryPage();
   if (id === 'page-outbound-query') initObQueryPage();
+  if (id === 'page-overview') loadOverview();
 }
 
 async function api(method, url, body) {
@@ -25,7 +26,12 @@ async function api(method, url, body) {
   };
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(url, opts);
-  return res.json();
+  try {
+    return await res.json();
+  } catch (e) {
+    // 服务器返回非 JSON（如 HTML 错误页），统一包装成标准错误对象
+    return { code: res.status, msg: `服务器错误 (${res.status})` };
+  }
 }
 
 // ===================== 登录 =====================
@@ -67,12 +73,93 @@ async function checkSession() {
   }
 }
 
+// ===================== 数据概览 =====================
+async function loadOverview() {
+  // 重置为加载状态
+  document.getElementById('overview-time-tip').textContent = '加载中…';
+  ['ov-ib-pkg','ov-ib-weight','ov-ob-trip','ov-ob-pkg','ov-ob-weight'].forEach(id => {
+    document.getElementById(id).textContent = '…';
+  });
+  document.getElementById('ov-ib-tbody').innerHTML = '<tr><td colspan="4" class="no-data">加载中…</td></tr>';
+  document.getElementById('ov-ob-tbody').innerHTML = '<tr><td colspan="4" class="no-data">加载中…</td></tr>';
+
+  function overviewError(msg) {
+    document.getElementById('overview-time-tip').textContent = msg;
+    ['ov-ib-pkg','ov-ib-weight','ov-ob-trip','ov-ob-pkg','ov-ob-weight'].forEach(id => {
+      document.getElementById(id).textContent = '—';
+    });
+    document.getElementById('ov-ib-tbody').innerHTML = `<tr><td colspan="4" class="no-data">${msg}</td></tr>`;
+    document.getElementById('ov-ob-tbody').innerHTML = `<tr><td colspan="4" class="no-data">${msg}</td></tr>`;
+  }
+
+  try {
+    const res = await api('GET', '/api/overview');
+    if (res.code === 403) {
+      overviewError('无权限：仅管理员可查看概览数据');
+      return;
+    }
+    if (res.code !== 200) {
+      overviewError(res.msg || '数据加载失败，请刷新重试');
+      showToast(res.msg || '概览数据加载失败', 'error');
+      return;
+    }
+
+    // 时间范围提示
+    document.getElementById('overview-time-tip').innerHTML =
+      `📥 入库统计区间：<strong>${res.ib_start}</strong> ~ <strong>${res.ib_end}</strong>&nbsp;&nbsp;` +
+      `📤 出库统计日期：<strong>${res.ob_date}</strong>`;
+
+    // 汇总数字
+    document.getElementById('ov-ib-pkg').textContent    = res.ib_total.pkg_count;
+    document.getElementById('ov-ib-weight').textContent = res.ib_total.total_weight ?? 0;
+    document.getElementById('ov-ob-trip').textContent   = res.ob_total.trip_count;
+    document.getElementById('ov-ob-pkg').textContent    = res.ob_total.pkg_count;
+    document.getElementById('ov-ob-weight').textContent = res.ob_total.total_weight ?? 0;
+
+    // 入库明细表
+    const ibTbody = document.getElementById('ov-ib-tbody');
+    if (!res.inbound.length) {
+      ibTbody.innerHTML = '<tr><td colspan="4" class="no-data">该时段暂无入库记录</td></tr>';
+    } else {
+      ibTbody.innerHTML = res.inbound.map(r => `
+        <tr>
+          <td>${escHtml(r.equipment)}</td>
+          <td>${escHtml(r.batch_no)}</td>
+          <td><strong>${r.pkg_count}</strong></td>
+          <td><strong>${r.total_weight}</strong></td>
+        </tr>
+      `).join('');
+    }
+
+    // 出库明细表
+    const obTbody = document.getElementById('ov-ob-tbody');
+    if (!res.outbound.length) {
+      obTbody.innerHTML = '<tr><td colspan="4" class="no-data">今日暂无出库记录</td></tr>';
+    } else {
+      obTbody.innerHTML = res.outbound.map(r => `
+        <tr>
+          <td>${escHtml(r.factory)}</td>
+          <td>${escHtml(r.trip)}</td>
+          <td><strong>${r.pkg_count}</strong></td>
+          <td><strong>${r.total_weight}</strong></td>
+        </tr>
+      `).join('');
+    }
+  } catch (e) {
+    overviewError('请求失败，请检查网络后重试');
+    showToast('请求失败，请重试', 'error');
+  }
+}
+
 // ===================== 入库 =====================
 let ibItems = [];
 
 function initIbPage() {
   ibItems = [];
-  document.getElementById('ib-factory').value = '';
+  // 厂区默认选中3号厂房
+  document.getElementById('ib-factory-3').checked = true;
+  // 包装形式默认选中标包
+  document.getElementById('ib-pkgtype-std').checked = true;
   renderIbTable();
   addIbRow(); // 默认一行
 }
@@ -97,24 +184,43 @@ function renderIbTable() {
 
 function addIbRow() {
   const last = ibItems[ibItems.length - 1];
+  const pkgType = document.querySelector('input[name="ib-package-type"]:checked')?.value || '标包';
+
   let newPkg = '';
   if (last && last.package_no) {
     const num = parseInt(last.package_no);
     newPkg = isNaN(num) ? last.package_no : String(num + 1);
   }
-  ibItems.push({
-    batch_no: last ? last.batch_no : '',
-    equipment: last ? last.equipment : '',
-    package_no: newPkg,
-    weight: last ? last.weight : ''
-  });
+
+  if (pkgType === '非标包') {
+    // 非标包：复制批号、设备，包号自动+1，重量清空
+    ibItems.push({
+      batch_no: last ? last.batch_no : '',
+      equipment: last ? last.equipment : '',
+      package_no: newPkg,
+      weight: ''
+    });
+  } else {
+    // 标包：完整复制上一行（原有逻辑）
+    ibItems.push({
+      batch_no: last ? last.batch_no : '',
+      equipment: last ? last.equipment : '',
+      package_no: newPkg,
+      weight: last ? last.weight : ''
+    });
+  }
+
   renderIbTable();
   setTimeout(() => {
     const rows = document.getElementById('ib-tbody').querySelectorAll('tr');
     if (rows.length > 0) {
       const lastRow = rows[rows.length - 1];
       const inputs = lastRow.querySelectorAll('input');
-      if (inputs.length > 0) inputs[ibItems.length === 1 ? 0 : 1].focus();
+      if (inputs.length > 0) {
+        // 非标包时光标定位到重量列，标包时定位到第2列（包号）
+        const focusIdx = pkgType === '非标包' ? 3 : (ibItems.length === 1 ? 0 : 1);
+        inputs[Math.min(focusIdx, inputs.length - 1)].focus();
+      }
     }
   }, 50);
 }
@@ -125,7 +231,8 @@ function removeIbRow(i) {
 }
 
 function previewInbound() {
-  const factory = document.getElementById('ib-factory').value;
+  const factory = document.querySelector('input[name="ib-factory"]:checked')?.value || '';
+  const pkgType = document.querySelector('input[name="ib-package-type"]:checked')?.value || '';
   if (!factory) { showToast('请选择厂区', 'error'); return; }
   if (ibItems.length === 0) { showToast('请至少录入一行物料', 'error'); return; }
   // 验证所有行
@@ -147,6 +254,7 @@ function previewInbound() {
   document.getElementById('ib-order-no-preview').textContent = preview;
   document.getElementById('ib-confirm-factory').textContent = factory;
   document.getElementById('ib-confirm-line').textContent = line;
+  document.getElementById('ib-confirm-pkgtype').textContent = pkgType;
 
   const tbody = document.getElementById('ib-confirm-tbody');
   let totalWeight = 0;
@@ -166,10 +274,11 @@ function closeIbConfirm() {
 }
 
 async function submitInbound() {
-  const factory = document.getElementById('ib-factory').value;
+  const factory = document.querySelector('input[name="ib-factory"]:checked')?.value || '';
+  const pkgType = document.querySelector('input[name="ib-package-type"]:checked')?.value || '';
   const line = ibItems[0].equipment.trim();
   const res = await api('POST', '/api/inbound', {
-    factory, equipment: line, items: ibItems
+    factory, equipment: line, package_type: pkgType, items: ibItems
   });
   if (res.code === 200) {
     closeIbConfirm();
@@ -248,7 +357,9 @@ let obItems = [];
 
 function initObPage() {
   obItems = [];
-  document.getElementById('ob-factory').value = '';
+  // 重置厂区 radio 为默认值（3号厂房）
+  const defaultFactory = document.querySelector('input[name="ob-factory"][value="3号厂房"]');
+  if (defaultFactory) defaultFactory.checked = true;
   document.getElementById('ob-trip').value = '';
   renderObTable();
   addObRow();
@@ -286,7 +397,9 @@ function addObRow() {
     if (rows.length > 0) {
       const lastRow = rows[rows.length - 1];
       const inputs = lastRow.querySelectorAll('input');
-      if (inputs.length > 0) inputs[0].focus();
+      // 列顺序：批号(0) 设备(1) 包号(2) 质量(3)，定位到包号
+      if (inputs.length > 2) inputs[2].focus();
+      else if (inputs.length > 0) inputs[0].focus();
     }
   }, 50);
 }
@@ -297,7 +410,7 @@ function removeObRow(i) {
 }
 
 function previewOutbound() {
-  const factory = document.getElementById('ob-factory').value;
+  const factory = document.querySelector('input[name="ob-factory"]:checked')?.value || '';
   const trip = document.getElementById('ob-trip').value.trim();
   if (!factory) { showToast('请选择厂区', 'error'); return; }
   if (!trip) { showToast('请输入车次', 'error'); return; }
@@ -335,7 +448,7 @@ function closeObConfirm() {
 }
 
 async function submitOutbound() {
-  const factory = document.getElementById('ob-factory').value;
+  const factory = document.querySelector('input[name="ob-factory"]:checked')?.value || '';
   const trip = document.getElementById('ob-trip').value.trim();
   const res = await api('POST', '/api/outbound', { factory, trip, items: obItems });
   if (res.code === 200) {
