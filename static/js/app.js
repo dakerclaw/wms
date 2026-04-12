@@ -598,7 +598,7 @@ async function loadUsers() {
       <td>${u.created_at}</td>
       <td>
         <button class="btn btn-warning btn-sm" onclick="openEditUser(${u.id},'${escHtml(u.username)}','${u.role}')">修改</button>
-        ${u.username !== 'shangtai' ? `<button class="btn btn-danger btn-sm" style="margin-left:6px;" onclick="deleteUser(${u.id},'${escHtml(u.username)}')">删除</button>` : ''}
+        ${u.username !== 'admin' ? `<button class="btn btn-danger btn-sm" style="margin-left:6px;" onclick="deleteUser(${u.id},'${escHtml(u.username)}')">删除</button>` : ''}
       </td>
     </tr>
   `).join('');
@@ -804,24 +804,29 @@ async function doClean() {
   const obCount = document.getElementById('clean-ob-count').textContent;
 
   // 二次确认
-  if (!confirm(`确认删除 ${date} 之前的记录？\n入库单 ${ibCount} 条，出库单 ${obCount} 条\n\n此操作不可撤销！`)) return;
-
-  try {
-    const res = await fetch('/api/records/delete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ before_date: date })
-    });
-    const data = await res.json();
-    if (data.code === 200) {
-      showToast(data.msg, 'success');
-      closeCleanModal();
-    } else {
-      showToast(data.msg || '删除失败', 'error');
+  showGenericConfirm(
+    '确认删除',
+    `将删除 ${date} 之前的记录：\n入库单 ${ibCount} 条，出库单 ${obCount} 条\n\n此操作不可撤销！`,
+    '确认删除',
+    async function() {
+      try {
+        const res = await fetch('/api/records/delete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ before_date: date })
+        });
+        const data = await res.json();
+        if (data.code === 200) {
+          showToast(data.msg, 'success');
+          closeCleanModal();
+        } else {
+          showToast(data.msg || '删除失败', 'error');
+        }
+      } catch (e) {
+        showToast('请求失败，请重试', 'error');
+      }
     }
-  } catch (e) {
-    showToast('请求失败，请重试', 'error');
-  }
+  );
 }
 
 // ===================== 数据库备份管理 =====================
@@ -952,23 +957,24 @@ async function doCreateBackup() {
 
 async function doDeleteBackups() {
   if (!backupFilterDate) { showToast('请先查询备份', 'error'); return; }
-  if (!confirm('确认删除查询结果中的所有备份文件？\n此操作不可撤销！')) return;
-  try {
-    const res = await fetch('/api/backup/delete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ before_date: backupFilterDate })
-    });
-    const data = await res.json();
-    if (data.code === 200) {
-      showToast(data.msg, 'success');
-      queryBackupList();  // 刷新查询结果
-    } else {
-      showToast(data.msg || '删除失败', 'error');
+  showGenericConfirm('确认删除', '确认删除查询结果中的所有备份文件？\n此操作不可撤销！', '确认删除', async function() {
+    try {
+      const res = await fetch('/api/backup/delete', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ before_date: backupFilterDate })
+      });
+      const data = await res.json();
+      if (data.code === 200) {
+        showToast(data.msg, 'success');
+        queryBackupList();
+      } else {
+        showToast(data.msg || '删除失败', 'error');
+      }
+    } catch (e) {
+      showToast('请求失败，请重试', 'error');
     }
-  } catch (e) {
-    showToast('请求失败，请重试', 'error');
-  }
+  });
 }
 
 // ===================== XSS防护 =====================
