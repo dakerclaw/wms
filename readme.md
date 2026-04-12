@@ -82,7 +82,7 @@ sudo supervisorctl update
 sudo supervisorctl status wms
 ```
 
-应显示 `RUNNING`。
+应显示 `RUNNING`或 `STARTING`。
 
 > **注意**：`<<EOF`（不加引号）才能让 shell 替换 `$USER`。如果替换失败，请直接将 `user=$USER` 改为你的用户名（如 `user=mac`）。
 
@@ -239,7 +239,7 @@ supervisorctl update
 supervisorctl status wms
 ```
 
-应显示 `RUNNING`。
+应显示 `RUNNING`或 `STARTING`。
 
 ### 7. 防火墙放行
 
