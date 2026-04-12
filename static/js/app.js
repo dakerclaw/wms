@@ -164,6 +164,23 @@ function initIbPage() {
   addIbRow(); // 默认一行
 }
 
+// 通用函数：同步 tbody 中所有 input 的当前值到数组（防止手机端 oninput 未及时触发）
+function syncCurrentInputs(tbodyId, items) {
+  const tbody = document.getElementById(tbodyId);
+  const rows = tbody.querySelectorAll('tr');
+  rows.forEach((tr, i) => {
+    if (i >= items.length) return;
+    const inputs = tr.querySelectorAll('input');
+    inputs.forEach(inp => {
+      const fn = inp.getAttribute('oninput');
+      if (fn) {
+        // 用 Function 执行 oninput 回调中的赋值表达式
+        try { new Function(fn)(); } catch(e) {}
+      }
+    });
+  });
+}
+
 function renderIbTable() {
   const tbody = document.getElementById('ib-tbody');
   if (ibItems.length === 0) {
@@ -183,6 +200,9 @@ function renderIbTable() {
 }
 
 function addIbRow() {
+  // 添加行前先同步当前所有 input 的值到数组（防止手机端 oninput 未及时触发）
+  syncCurrentInputs('ib-tbody', ibItems);
+
   const last = ibItems[ibItems.length - 1];
   const pkgType = document.querySelector('input[name="ib-package-type"]:checked')?.value || '标包';
 
@@ -193,7 +213,6 @@ function addIbRow() {
   }
 
   if (pkgType === '非标包') {
-    // 非标包：复制批号、设备，包号自动+1，重量清空
     ibItems.push({
       batch_no: last ? last.batch_no : '',
       equipment: last ? last.equipment : '',
@@ -201,7 +220,6 @@ function addIbRow() {
       weight: ''
     });
   } else {
-    // 标包：完整复制上一行（原有逻辑）
     ibItems.push({
       batch_no: last ? last.batch_no : '',
       equipment: last ? last.equipment : '',
@@ -210,17 +228,29 @@ function addIbRow() {
     });
   }
 
-  renderIbTable();
+  const tbody = document.getElementById('ib-tbody');
+  // 如果 tbody 里只有"暂无数据"提示，先清空
+  if (tbody.querySelector('.no-data')) tbody.innerHTML = '';
+
+  // 只追加新行，不重建整个表格
+  const idx = ibItems.length - 1;
+  const item = ibItems[idx];
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="td-no" data-row="1">${idx + 1}</td>
+    <td data-row="2"><input type="text" value="${escHtml(item.batch_no)}" oninput="ibItems[${idx}].batch_no=this.value" placeholder="物料批号"></td>
+    <td data-row="3"><input type="text" value="${escHtml(item.equipment)}" oninput="ibItems[${idx}].equipment=this.value" placeholder="设备"></td>
+    <td data-row="3"><input type="text" value="${escHtml(item.package_no)}" oninput="ibItems[${idx}].package_no=this.value" placeholder="包号"></td>
+    <td data-row="3"><input type="number" step="0.01" value="${item.weight}" oninput="ibItems[${idx}].weight=parseFloat(this.value)||0" placeholder="质量(kg)"></td>
+    <td data-row="1"><button class="btn btn-danger btn-sm" onclick="removeIbRow(${idx})">删</button></td>
+  `;
+  tbody.appendChild(tr);
+
   setTimeout(() => {
-    const rows = document.getElementById('ib-tbody').querySelectorAll('tr');
-    if (rows.length > 0) {
-      const lastRow = rows[rows.length - 1];
-      const inputs = lastRow.querySelectorAll('input');
-      if (inputs.length > 0) {
-        // 非标包时光标定位到重量列，标包时定位到第2列（包号）
-        const focusIdx = pkgType === '非标包' ? 3 : (ibItems.length === 1 ? 0 : 1);
-        inputs[Math.min(focusIdx, inputs.length - 1)].focus();
-      }
+    const inputs = tr.querySelectorAll('input');
+    if (inputs.length > 0) {
+      const focusIdx = pkgType === '非标包' ? 3 : (ibItems.length === 1 ? 0 : 1);
+      inputs[Math.min(focusIdx, inputs.length - 1)].focus();
     }
   }, 50);
 }
@@ -384,6 +414,9 @@ function renderObTable() {
 }
 
 function addObRow() {
+  // 添加行前先同步当前所有 input 的值到数组
+  syncCurrentInputs('ob-tbody', obItems);
+
   const last = obItems[obItems.length - 1];
   obItems.push({
     batch_no: last ? last.batch_no : '',
@@ -391,16 +424,28 @@ function addObRow() {
     package_no: '',
     weight: last ? last.weight : ''
   });
-  renderObTable();
+
+  const tbody = document.getElementById('ob-tbody');
+  if (tbody.querySelector('.no-data')) tbody.innerHTML = '';
+
+  // 只追加新行
+  const idx = obItems.length - 1;
+  const item = obItems[idx];
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="td-no" data-row="1">${idx + 1}</td>
+    <td data-row="2"><input type="text" value="${escHtml(item.batch_no)}" oninput="obItems[${idx}].batch_no=this.value" placeholder="物料批号"></td>
+    <td data-row="3"><input type="text" value="${escHtml(item.equipment)}" oninput="obItems[${idx}].equipment=this.value" placeholder="设备"></td>
+    <td data-row="3"><input type="text" value="${escHtml(item.package_no)}" oninput="obItems[${idx}].package_no=this.value" placeholder="包号"></td>
+    <td data-row="3"><input type="number" step="0.01" value="${item.weight}" oninput="obItems[${idx}].weight=parseFloat(this.value)||0" placeholder="质量(kg)"></td>
+    <td data-row="1"><button class="btn btn-danger btn-sm" onclick="removeObRow(${idx})">删</button></td>
+  `;
+  tbody.appendChild(tr);
+
   setTimeout(() => {
-    const rows = document.getElementById('ob-tbody').querySelectorAll('tr');
-    if (rows.length > 0) {
-      const lastRow = rows[rows.length - 1];
-      const inputs = lastRow.querySelectorAll('input');
-      // 列顺序：批号(0) 设备(1) 包号(2) 质量(3)，定位到包号
-      if (inputs.length > 2) inputs[2].focus();
-      else if (inputs.length > 0) inputs[0].focus();
-    }
+    const inputs = tr.querySelectorAll('input');
+    if (inputs.length > 2) inputs[2].focus();
+    else if (inputs.length > 0) inputs[0].focus();
   }, 50);
 }
 
