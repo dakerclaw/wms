@@ -163,7 +163,7 @@ sudo apt autoremove -y
 | 启动 / 停止 / 重启 | `sudo supervisorctl start\|stop\|restart wms` |
 | 查看状态 | `sudo supervisorctl status wms` |
 | 实时日志 | `sudo supervisorctl tail -f wms` |
-| 错误日志 | `tail -f /opt/wms/logs/error.log` |
+| 错误日志 | `tail -f /opt/wms/logs/supervisor.log` |
 | 数据库备份 | 系统内置备份功能，或 `cp /opt/wms/wms.db /opt/wms/backup/` |
 
 ---
@@ -311,14 +311,14 @@ apt autoremove -y
 
 > ⚠️ Python3、git、pip 等基础工具不建议卸载。
 
-### 4. 日常运维
+## 四、日常运维
 
 | 操作 | 命令 |
 |------|------|
 | 启动 / 停止 / 重启 | `supervisorctl start\|stop\|restart wms` |
 | 查看状态 | `supervisorctl status wms` |
 | 实时日志 | `supervisorctl tail -f wms` |
-| 错误日志 | `tail -f /opt/wms/logs/error.log` |
+| 错误日志 | `tail -f /opt/wms/logs/supervisor.log` |
 | 数据库备份 | 系统内置备份功能，或 `cp /opt/wms/wms.db /opt/wms/backup/` |
 
 ---

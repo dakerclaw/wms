@@ -1,5 +1,6 @@
 from flask import Flask, request, jsonify, session, send_from_directory
 from flask_cors import CORS
+from functools import wraps
 import sqlite3
 import os
 import hashlib
@@ -13,7 +14,7 @@ import glob
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 BACKUP_DIR = os.path.join(BASE_DIR, 'backup')
 app = Flask(__name__)
-app.secret_key = 'wms_secret_key_2026'
+app.secret_key = os.environ.get('WMS_SECRET_KEY', 'wms_secret_key_2026')
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
@@ -115,7 +116,6 @@ def gen_order_no(prefix):
 
 
 def require_login(f):
-    from functools import wraps
     @wraps(f)
     def decorated(*args, **kwargs):
         if 'user' not in session:
@@ -125,7 +125,6 @@ def require_login(f):
 
 
 def require_admin(f):
-    from functools import wraps
     @wraps(f)
     def decorated(*args, **kwargs):
         if 'user' not in session:
@@ -145,11 +144,6 @@ def index():
 @app.route('/static/<path:filename>')
 def serve_static(filename):
     return send_from_directory(os.path.join(BASE_DIR, 'static'), filename)
-
-
-@app.route('/templates/<path:filename>')
-def serve_template(filename):
-    return send_from_directory(os.path.join(BASE_DIR, 'templates'), filename)
 
 
 # ===== 认证 =====
@@ -233,6 +227,11 @@ def update_user(uid):
     role = data.get('role', 'user')
     conn = get_db()
     try:
+        user = conn.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
+        if not user:
+            return jsonify({'code': 404, 'msg': '用户不存在'}), 404
+        if user['username'] == 'admin' and role != 'admin':
+            return jsonify({'code': 400, 'msg': '不能修改超级管理员的角色'}), 400
         if password:
             conn.execute("UPDATE users SET password=?, role=? WHERE id=?",
                          (hash_pwd(password), role, uid))
@@ -309,8 +308,11 @@ def import_users():
 @require_admin
 def overview():
     now = datetime.datetime.now()
-    # 今日早8点
-    today_8 = now.replace(hour=8, minute=0, second=0, microsecond=0)
+    # 今日早8点：如果当前时间 < 8:00，"今天8点"是昨天的8点
+    if now.hour < 8:
+        today_8 = now.replace(hour=8, minute=0, second=0, microsecond=0) - datetime.timedelta(days=1)
+    else:
+        today_8 = now.replace(hour=8, minute=0, second=0, microsecond=0)
     # 昨日早8点
     yesterday_8 = today_8 - datetime.timedelta(days=1)
     ib_start = yesterday_8.strftime('%Y-%m-%d %H:%M:%S')
@@ -409,6 +411,8 @@ def create_inbound():
             )
         conn.commit()
         return jsonify({'code': 200, 'msg': '入库成功', 'order_no': order_no})
+    except Exception as e:
+        return jsonify({'code': 500, 'msg': f'入库失败：{str(e)}'}), 500
     finally:
         conn.close()
 
@@ -478,6 +482,8 @@ def create_outbound():
             )
         conn.commit()
         return jsonify({'code': 200, 'msg': '出库成功', 'order_no': order_no})
+    except Exception as e:
+        return jsonify({'code': 500, 'msg': f'出库失败：{str(e)}'}), 500
     finally:
         conn.close()
 
