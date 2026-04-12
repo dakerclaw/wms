@@ -39,6 +39,13 @@ def init_db():
         role TEXT NOT NULL DEFAULT 'user',
         created_at TEXT DEFAULT (datetime('now','localtime'))
     )''')
+    # 厂区表
+    c.execute('''CREATE TABLE IF NOT EXISTS factories (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name TEXT UNIQUE NOT NULL,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        created_at TEXT DEFAULT (datetime('now','localtime'))
+    )''')
     # 入库单表
     c.execute('''CREATE TABLE IF NOT EXISTS inbound_orders (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -94,6 +101,13 @@ def init_db():
     if 'package_type' not in cols:
         conn.execute("ALTER TABLE inbound_orders ADD COLUMN package_type TEXT NOT NULL DEFAULT '标包'")
     conn.commit()
+
+    # 初始化默认厂区（仅在表为空时插入）
+    factory_count = conn.execute("SELECT COUNT(*) FROM factories").fetchone()[0]
+    if factory_count == 0:
+        conn.executemany("INSERT INTO factories (name, sort_order) VALUES (?, ?)",
+                         [('3号厂房', 1), ('10号厂房', 2)])
+        conn.commit()
 
     # 初始化管理员账号
     pwd = hashlib.md5('admin001'.encode()).hexdigest()
@@ -183,6 +197,85 @@ def me():
 
 
 # ===== 账号管理 =====
+# ==================== 厂区管理 API ====================
+
+@app.route('/api/factories', methods=['GET'])
+@require_login
+def get_factories():
+    """获取所有厂区列表，所有已登录用户可用"""
+    conn = get_db()
+    try:
+        rows = conn.execute("SELECT id, name, sort_order, created_at FROM factories ORDER BY sort_order, id").fetchall()
+        return jsonify({'code': 200, 'data': [dict(r) for r in rows]})
+    finally:
+        conn.close()
+
+
+@app.route('/api/factories', methods=['POST'])
+@require_admin
+def add_factory():
+    """新增厂区（管理员）"""
+    data = request.json
+    if not data:
+        return jsonify({'code': 400, 'msg': '请求格式错误'})
+    name = data.get('name', '').strip()
+    if not name:
+        return jsonify({'code': 400, 'msg': '厂区名称不能为空'})
+    sort_order = data.get('sort_order', 0)
+    conn = get_db()
+    try:
+        conn.execute("INSERT INTO factories (name, sort_order) VALUES (?, ?)", (name, sort_order))
+        conn.commit()
+        return jsonify({'code': 200, 'msg': '添加成功'})
+    except sqlite3.IntegrityError:
+        return jsonify({'code': 400, 'msg': '厂区名称已存在'})
+    finally:
+        conn.close()
+
+
+@app.route('/api/factories/<int:fid>', methods=['PUT'])
+@require_admin
+def update_factory(fid):
+    """修改厂区（管理员）"""
+    data = request.json
+    if not data:
+        return jsonify({'code': 400, 'msg': '请求格式错误'})
+    name = data.get('name', '').strip()
+    sort_order = data.get('sort_order', 0)
+    if not name:
+        return jsonify({'code': 400, 'msg': '厂区名称不能为空'})
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT id FROM factories WHERE id=?", (fid,)).fetchone()
+        if not row:
+            return jsonify({'code': 404, 'msg': '厂区不存在'}), 404
+        conn.execute("UPDATE factories SET name=?, sort_order=? WHERE id=?", (name, sort_order, fid))
+        conn.commit()
+        return jsonify({'code': 200, 'msg': '修改成功'})
+    except sqlite3.IntegrityError:
+        return jsonify({'code': 400, 'msg': '厂区名称已存在'})
+    finally:
+        conn.close()
+
+
+@app.route('/api/factories/<int:fid>', methods=['DELETE'])
+@require_admin
+def delete_factory(fid):
+    """删除厂区（管理员）"""
+    conn = get_db()
+    try:
+        row = conn.execute("SELECT id FROM factories WHERE id=?", (fid,)).fetchone()
+        if not row:
+            return jsonify({'code': 404, 'msg': '厂区不存在'}), 404
+        conn.execute("DELETE FROM factories WHERE id=?", (fid,))
+        conn.commit()
+        return jsonify({'code': 200, 'msg': '删除成功'})
+    finally:
+        conn.close()
+
+
+# ==================== 用户管理 API ====================
+
 @app.route('/api/users', methods=['GET'])
 @require_admin
 def get_users():
