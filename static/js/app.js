@@ -237,8 +237,6 @@ function syncCurrentInputs(tbodyId, items) {
     if (inputs[2]) items[i].package_no = inputs[2].value;
     if (inputs[3]) items[i].weight = parseFloat(inputs[3].value) || 0;
   });
-  console.log('[syncCurrentInputs] 同步完成，数组长度:', items.length,
-    items.length > 0 ? '最后一行: batch=' + items[items.length-1].batch_no + ', eq=' + items[items.length-1].equipment + ', w=' + items[items.length-1].weight : '');
 }
 
 function renderIbTable() {
