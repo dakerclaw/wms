@@ -77,6 +77,11 @@
           <h3>数据概览</h3>
           <p>昨日入库与今日出库快速汇总</p>
         </div>
+        <div class="menu-card" style="border:2px dashed #eb2f96;" onclick="showPage('page-factory-manage')">
+          <div class="icon">🏭</div>
+          <h3>厂区管理</h3>
+          <p>新增、修改、删除厂区（管理员）</p>
+        </div>
         <div class="menu-card" style="border:2px dashed #fa8c16;" onclick="showPage('page-user-manage')">
           <div class="icon">👤</div>
           <h3>账号管理</h3>
@@ -187,13 +192,8 @@
       <div class="form-row">
         <div class="form-group">
           <label>厂区 <span style="color:red">*</span></label>
-          <div class="radio-group">
-            <label class="radio-label">
-              <input type="radio" name="ib-factory" id="ib-factory-3" value="3号厂房" checked> 3号厂房
-            </label>
-            <label class="radio-label">
-              <input type="radio" name="ib-factory" id="ib-factory-10" value="10号厂房"> 10号厂房
-            </label>
+          <div class="radio-group" id="ib-factory-group">
+            <!-- 由 JS 动态加载 -->
           </div>
         </div>
         <div class="form-group">
@@ -287,8 +287,7 @@
           <label>厂区</label>
           <select class="form-control" id="iq-factory">
             <option value="">全部</option>
-            <option value="3号厂房">3号厂房</option>
-            <option value="10号厂房">10号厂房</option>
+            <!-- 由 JS 动态加载 -->
           </select>
         </div>
         <div class="form-group">
@@ -342,13 +341,8 @@
       <div class="form-row">
         <div class="form-group">
           <label>厂区 <span style="color:red">*</span></label>
-          <div class="radio-group">
-            <label class="radio-label">
-              <input type="radio" name="ob-factory" value="3号厂房" checked> 3号厂房
-            </label>
-            <label class="radio-label">
-              <input type="radio" name="ob-factory" value="10号厂房"> 10号厂房
-            </label>
+          <div class="radio-group" id="ob-factory-group">
+            <!-- 由 JS 动态加载 -->
           </div>
         </div>
         <div class="form-group">
@@ -430,8 +424,7 @@
           <label>厂区</label>
           <select class="form-control" id="oq-factory">
             <option value="">全部</option>
-            <option value="3号厂房">3号厂房</option>
-            <option value="10号厂房">10号厂房</option>
+            <!-- 由 JS 动态加载 -->
           </select>
         </div>
         <div class="form-group">
@@ -591,6 +584,67 @@
     <div class="modal-actions" style="display:flex;gap:12px;margin-top:24px;justify-content:flex-end;">
       <button class="btn btn-default" onclick="closeGenericConfirm()">取消</button>
       <button class="btn btn-danger" id="generic-confirm-ok" onclick="">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== 厂区管理 ==================== -->
+<div class="page" id="page-factory-manage">
+  <div class="content-wrap">
+    <div class="page-header">
+      <button class="back-btn" onclick="showPage('page-menu')">←</button>
+      <h2>厂区管理</h2>
+    </div>
+    <div class="card">
+      <div class="card-title">新增厂区</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>厂区名称 <span style="color:red">*</span></label>
+          <input type="text" class="form-control" id="fm-name" placeholder="请输入厂区名称">
+        </div>
+        <div class="form-group">
+          <label>排序号</label>
+          <input type="number" class="form-control" id="fm-order" value="0" min="0">
+        </div>
+        <div class="form-group" style="display:flex;align-items:flex-end;">
+          <button class="btn btn-success" style="width:100%;" onclick="addFactory()">＋ 新增</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">厂区列表</div>
+      <div class="result-table-wrap">
+        <table class="result-table">
+          <thead>
+            <tr><th>ID</th><th>厂区名称</th><th>排序号</th><th>创建时间</th><th>操作</th></tr>
+          </thead>
+          <tbody id="fm-tbody">
+            <tr><td colspan="5" class="no-data">加载中...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 修改厂区弹窗 -->
+<div class="confirm-overlay" id="edit-factory-overlay">
+  <div class="confirm-modal" style="width:380px;">
+    <h3>修改厂区</h3>
+    <div style="margin-top:20px;">
+      <input type="hidden" id="edit-fid">
+      <div class="form-group">
+        <label>厂区名称 <span style="color:red">*</span></label>
+        <input type="text" class="form-control" id="edit-fname" placeholder="请输入厂区名称">
+      </div>
+      <div class="form-group">
+        <label>排序号</label>
+        <input type="number" class="form-control" id="edit-forder" min="0">
+      </div>
+      <div class="modal-actions" style="display:flex;gap:12px;margin-top:20px;justify-content:flex-end;">
+        <button class="btn btn-default" onclick="closeEditFactory()">取消</button>
+        <button class="btn btn-primary" onclick="saveEditFactory()">保存</button>
+      </div>
     </div>
   </div>
 </div>
