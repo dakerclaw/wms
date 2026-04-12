@@ -95,10 +95,10 @@ def init_db():
     conn.commit()
 
     # 初始化管理员账号
-    pwd = hashlib.md5('st999777'.encode()).hexdigest()
+    pwd = hashlib.md5('admin001'.encode()).hexdigest()
     try:
         c.execute("INSERT INTO users (username, password, role) VALUES (?, ?, ?)",
-                  ('shangtai', pwd, 'admin'))
+                  ('admin', pwd, 'admin'))
         conn.commit()
     except sqlite3.IntegrityError:
         pass
@@ -250,7 +250,7 @@ def delete_user(uid):
     conn = get_db()
     try:
         user = conn.execute("SELECT * FROM users WHERE id=?", (uid,)).fetchone()
-        if user and user['username'] == 'shangtai':
+        if user and user['username'] == 'admin':
             return jsonify({'code': 400, 'msg': '不能删除超级管理员'})
         conn.execute("DELETE FROM users WHERE id=?", (uid,))
         conn.commit()
