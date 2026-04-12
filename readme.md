@@ -98,7 +98,7 @@ sudo ufw --force enable
 
 浏览器打开 `http://服务器IP:5000`
 
-默认管理员账号：**shangtai** / **st999777**
+默认管理员账号：**admin** / **admin001**
 
 ## 二、更新升级
 
