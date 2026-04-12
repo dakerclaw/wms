@@ -1,4 +1,9 @@
 // ===================== 工具函数 =====================
+
+// 全局厂区缓存
+let _factories = [];
+let _factoriesLoaded = false;
+
 function showToast(msg, type = 'success', duration = 2500) {
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -11,11 +16,66 @@ function showPage(id) {
   document.getElementById(id).classList.add('active');
   // 进入账号管理时加载列表
   if (id === 'page-user-manage') loadUsers();
+  if (id === 'page-factory-manage') loadFactories();
   if (id === 'page-inbound') initIbPage();
   if (id === 'page-outbound') initObPage();
   if (id === 'page-inbound-query') initIbQueryPage();
   if (id === 'page-outbound-query') initObQueryPage();
   if (id === 'page-overview') loadOverview();
+}
+
+// ===================== 厂区公共加载 =====================
+
+async function loadFactoriesCache() {
+  if (_factoriesLoaded) return _factories;
+  try {
+    const res = await api('GET', '/api/factories');
+    if (res.code === 200) {
+      _factories = res.data || [];
+      _factoriesLoaded = true;
+    }
+  } catch (e) {
+    console.error('加载厂区失败', e);
+  }
+  // 兜底：如果接口失败，使用默认值
+  if (_factories.length === 0) {
+    _factories = [{ id: 1, name: '3号厂房', sort_order: 1 }, { id: 2, name: '10号厂房', sort_order: 2 }];
+    _factoriesLoaded = true;
+  }
+  return _factories;
+}
+
+function invalidateFactoriesCache() {
+  _factoriesLoaded = false;
+  _factories = [];
+}
+
+/** 渲染 radio 组（入库/出库页面用） */
+function renderFactoryRadio(containerId, radioName, checkedName) {
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  const factories = _factories;
+  container.innerHTML = factories.map((f, i) => `
+    <label class="radio-label">
+      <input type="radio" name="${radioName}" value="${escHtml(f.name)}" ${i === 0 || f.name === checkedName ? 'checked' : ''}> ${escHtml(f.name)}
+    </label>
+  `).join('');
+}
+
+/** 渲染 select 下拉（入库/出库查询用） */
+function renderFactorySelect(selectId) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  // 保留第一个 option（"全部"）
+  const firstOpt = sel.options[0];
+  sel.innerHTML = '';
+  sel.appendChild(firstOpt);
+  _factories.forEach(f => {
+    const opt = document.createElement('option');
+    opt.value = f.name;
+    opt.textContent = f.name;
+    sel.appendChild(opt);
+  });
 }
 
 async function api(method, url, body) {
@@ -154,10 +214,10 @@ async function loadOverview() {
 // ===================== 入库 =====================
 let ibItems = [];
 
-function initIbPage() {
+async function initIbPage() {
   ibItems = [];
-  // 厂区默认选中3号厂房
-  document.getElementById('ib-factory-3').checked = true;
+  await loadFactoriesCache();
+  renderFactoryRadio('ib-factory-group', 'ib-factory');
   // 包装形式默认选中标包
   document.getElementById('ib-pkgtype-std').checked = true;
   renderIbTable();
@@ -323,7 +383,7 @@ async function submitInbound() {
 // ===================== 入库查询 =====================
 let lastIbQueryData = [];
 
-function initIbQueryPage() {
+async function initIbQueryPage() {
   // 默认：昨日8:00 ~ 今日8:00
   const today = new Date();
   today.setHours(8, 0, 0, 0);
@@ -339,6 +399,8 @@ function initIbQueryPage() {
   };
   document.getElementById('iq-start').value = fmt(yesterday);
   document.getElementById('iq-end').value = fmt(today);
+  await loadFactoriesCache();
+  renderFactorySelect('iq-factory');
 }
 
 async function queryInbound() {
@@ -385,11 +447,10 @@ function exportInbound() {
 // ===================== 出库 =====================
 let obItems = [];
 
-function initObPage() {
+async function initObPage() {
   obItems = [];
-  // 重置厂区 radio 为默认值（3号厂房）
-  const defaultFactory = document.querySelector('input[name="ob-factory"][value="3号厂房"]');
-  if (defaultFactory) defaultFactory.checked = true;
+  await loadFactoriesCache();
+  renderFactoryRadio('ob-factory-group', 'ob-factory');
   document.getElementById('ob-trip').value = '';
   renderObTable();
   addObRow();
@@ -510,7 +571,7 @@ async function submitOutbound() {
 let lastObQueryData = [];
 let lastObOrderMap = {};  // order_no -> { order info + items[] }
 
-function initObQueryPage() {
+async function initObQueryPage() {
   const el = document.getElementById('oq-date');
   if (el && !el.value) {
     const now = new Date();
@@ -519,6 +580,8 @@ function initObQueryPage() {
     const d = String(now.getDate()).padStart(2, '0');
     el.value = `${y}-${m}-${d}`;
   }
+  await loadFactoriesCache();
+  renderFactorySelect('oq-factory');
 }
 
 async function queryOutbound() {
@@ -621,6 +684,91 @@ function exportOutboundDetail() {
   const rows = order.items.map((item, i) => [i + 1, item.batch_no, item.equipment, item.package_no, item.list_no, item.weight]);
   downloadXLSX(`出库单_${orderNo}.xlsx`, headers, rows);
   showToast('导出成功', 'success');
+}
+
+// ===================== 厂区管理 =====================
+
+async function loadFactories() {
+  const res = await api('GET', '/api/factories');
+  const tbody = document.getElementById('fm-tbody');
+  if (res.code !== 200) {
+    tbody.innerHTML = '<tr><td colspan="5" class="no-data">加载失败</td></tr>';
+    return;
+  }
+  _factories = res.data || [];
+  _factoriesLoaded = true;
+  if (_factories.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="5" class="no-data">暂无厂区数据</td></tr>';
+    return;
+  }
+  tbody.innerHTML = _factories.map(f => `
+    <tr>
+      <td>${f.id}</td>
+      <td>${escHtml(f.name)}</td>
+      <td>${f.sort_order}</td>
+      <td>${f.created_at || ''}</td>
+      <td>
+        <button class="btn btn-primary btn-sm" onclick="openEditFactory(${f.id},'${escHtml(f.name)}',${f.sort_order})">改</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteFactory(${f.id},'${escHtml(f.name)}')">删</button>
+      </td>
+    </tr>
+  `).join('');
+}
+
+async function addFactory() {
+  const name = document.getElementById('fm-name').value.trim();
+  const order = parseInt(document.getElementById('fm-order').value) || 0;
+  if (!name) { showToast('请输入厂区名称', 'error'); return; }
+  const res = await api('POST', '/api/factories', { name, sort_order: order });
+  if (res.code === 200) {
+    showToast('添加成功');
+    document.getElementById('fm-name').value = '';
+    document.getElementById('fm-order').value = '0';
+    invalidateFactoriesCache();
+    loadFactories();
+  } else {
+    showToast(res.msg || '添加失败', 'error');
+  }
+}
+
+function openEditFactory(id, name, order) {
+  document.getElementById('edit-fid').value = id;
+  document.getElementById('edit-fname').value = name;
+  document.getElementById('edit-forder').value = order;
+  document.getElementById('edit-factory-overlay').classList.add('show');
+}
+
+function closeEditFactory() {
+  document.getElementById('edit-factory-overlay').classList.remove('show');
+}
+
+async function saveEditFactory() {
+  const id = document.getElementById('edit-fid').value;
+  const name = document.getElementById('edit-fname').value.trim();
+  const order = parseInt(document.getElementById('edit-forder').value) || 0;
+  if (!name) { showToast('厂区名称不能为空', 'error'); return; }
+  const res = await api('PUT', `/api/factories/${id}`, { name, sort_order: order });
+  if (res.code === 200) {
+    showToast('修改成功');
+    closeEditFactory();
+    invalidateFactoriesCache();
+    loadFactories();
+  } else {
+    showToast(res.msg || '修改失败', 'error');
+  }
+}
+
+function deleteFactory(id, name) {
+  showGenericConfirm('删除厂区', `确认删除厂区「${name}」？此操作不可撤销。`, '确认删除', async function() {
+    const res = await api('DELETE', `/api/factories/${id}`);
+    if (res.code === 200) {
+      showToast('删除成功');
+      invalidateFactoriesCache();
+      loadFactories();
+    } else {
+      showToast(res.msg || '删除失败', 'error');
+    }
+  });
 }
 
 // ===================== 账号管理 =====================
