@@ -72,6 +72,11 @@
     <!-- 管理员专属 -->
     <div id="admin-menu-card" style="display:none;margin-top:24px;">
       <div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;">
+        <div class="menu-card" style="border:2px dashed #722ed1;" onclick="showPage('page-overview')">
+          <div class="icon">📊</div>
+          <h3>数据概览</h3>
+          <p>昨日入库与今日出库快速汇总</p>
+        </div>
         <div class="menu-card" style="border:2px dashed #fa8c16;" onclick="showPage('page-user-manage')">
           <div class="icon">👤</div>
           <h3>账号管理</h3>
@@ -92,6 +97,84 @@
   </div>
 </div>
 
+<!-- ==================== 数据概览 ==================== -->
+<div class="page" id="page-overview">
+  <div class="content-wrap">
+    <div class="page-header">
+      <button class="back-btn" onclick="showPage('page-menu')">←</button>
+      <h2>数据概览</h2>
+      <button class="btn btn-default btn-sm" style="margin-left:auto;" onclick="loadOverview()">🔄 刷新</button>
+    </div>
+
+    <!-- 时间范围提示 -->
+    <div id="overview-time-tip" class="overview-time-tip">加载中…</div>
+
+    <!-- 汇总数字卡片 -->
+    <div class="overview-stat-row">
+      <div class="overview-stat-card" style="border-top:3px solid #1677ff;">
+        <div class="overview-stat-label">入库包数</div>
+        <div class="overview-stat-num" id="ov-ib-pkg">—</div>
+      </div>
+      <div class="overview-stat-card" style="border-top:3px solid #1677ff;">
+        <div class="overview-stat-label">入库总质量（kg）</div>
+        <div class="overview-stat-num" id="ov-ib-weight">—</div>
+      </div>
+      <div class="overview-stat-card" style="border-top:3px solid #52c41a;">
+        <div class="overview-stat-label">出库车次</div>
+        <div class="overview-stat-num" id="ov-ob-trip">—</div>
+      </div>
+      <div class="overview-stat-card" style="border-top:3px solid #52c41a;">
+        <div class="overview-stat-label">出库包数</div>
+        <div class="overview-stat-num" id="ov-ob-pkg">—</div>
+      </div>
+      <div class="overview-stat-card" style="border-top:3px solid #52c41a;">
+        <div class="overview-stat-label">出库总质量（kg）</div>
+        <div class="overview-stat-num" id="ov-ob-weight">—</div>
+      </div>
+    </div>
+
+    <!-- 入库明细汇总 -->
+    <div class="card">
+      <div class="card-title" style="color:#1677ff;">📥 入库统计（按设备 / 物料批次）</div>
+      <div class="result-table-wrap">
+        <table class="result-table">
+          <thead>
+            <tr>
+              <th>设备</th>
+              <th>物料批号</th>
+              <th>包数</th>
+              <th>总质量（kg）</th>
+            </tr>
+          </thead>
+          <tbody id="ov-ib-tbody">
+            <tr><td colspan="4" class="no-data">加载中…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 出库明细汇总 -->
+    <div class="card">
+      <div class="card-title" style="color:#52c41a;">📤 出库统计（按厂区 / 车次）</div>
+      <div class="result-table-wrap">
+        <table class="result-table">
+          <thead>
+            <tr>
+              <th>厂区</th>
+              <th>车次</th>
+              <th>包数</th>
+              <th>总质量（kg）</th>
+            </tr>
+          </thead>
+          <tbody id="ov-ob-tbody">
+            <tr><td colspan="4" class="no-data">加载中…</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ==================== 物料入库 ==================== -->
 <div class="page" id="page-inbound">
   <div class="content-wrap">
@@ -104,11 +187,25 @@
       <div class="form-row">
         <div class="form-group">
           <label>厂区 <span style="color:red">*</span></label>
-          <select class="form-control" id="ib-factory">
-            <option value="">请选择厂区</option>
-            <option value="3号厂房">3号厂房</option>
-            <option value="10号厂房">10号厂房</option>
-          </select>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="ib-factory" id="ib-factory-3" value="3号厂房" checked> 3号厂房
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="ib-factory" id="ib-factory-10" value="10号厂房"> 10号厂房
+            </label>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>包装形式 <span style="color:red">*</span></label>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="ib-package-type" id="ib-pkgtype-std" value="标包" checked> 标包
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="ib-package-type" id="ib-pkgtype-nonstd" value="非标包"> 非标包
+            </label>
+          </div>
         </div>
       </div>
     </div>
@@ -148,6 +245,7 @@
     <div class="meta-info" style="margin-bottom:16px;font-size:14px;color:#555;display:flex;gap:16px;flex-wrap:wrap;">
       <span>厂区：<strong id="ib-confirm-factory"></strong></span>
       <span>设备：<strong id="ib-confirm-line"></strong></span>
+      <span>包装形式：<strong id="ib-confirm-pkgtype"></strong></span>
     </div>
     <div class="result-table-wrap">
       <table class="result-table">
@@ -244,11 +342,14 @@
       <div class="form-row">
         <div class="form-group">
           <label>厂区 <span style="color:red">*</span></label>
-          <select class="form-control" id="ob-factory">
-            <option value="">请选择厂区</option>
-            <option value="3号厂房">3号厂房</option>
-            <option value="10号厂房">10号厂房</option>
-          </select>
+          <div class="radio-group">
+            <label class="radio-label">
+              <input type="radio" name="ob-factory" value="3号厂房" checked> 3号厂房
+            </label>
+            <label class="radio-label">
+              <input type="radio" name="ob-factory" value="10号厂房"> 10号厂房
+            </label>
+          </div>
         </div>
         <div class="form-group">
           <label>车次 <span style="color:red">*</span></label>
