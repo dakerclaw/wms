@@ -85,6 +85,12 @@ async function api(method, url, body) {
     credentials: 'include'
   };
   if (body) opts.body = JSON.stringify(body);
+  // GET 请求加时间戳参数防止浏览器缓存返回旧数据
+  if (!body && url.includes('?')) {
+    url += '&_t=' + Date.now();
+  } else if (!body) {
+    url += '?_t=' + Date.now();
+  }
   const res = await fetch(url, opts);
   try {
     return await res.json();
