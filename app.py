@@ -125,7 +125,7 @@ def hash_pwd(pwd):
 
 
 def gen_order_no(prefix):
-    now = datetime.datetime.now()
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
     return f"{prefix}{now.strftime('%Y%m%d%H%M%S%f')[:18]}"
 
 
@@ -400,8 +400,8 @@ def import_users():
 @app.route('/api/overview', methods=['GET'])
 @require_admin
 def overview():
-    now = datetime.datetime.now()
-    # 今日早8点：如果当前时间 < 8:00，"今天8点"是昨天的8点
+    # 始终使用北京时间 UTC+8
+    now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
     if now.hour < 8:
         today_8 = now.replace(hour=8, minute=0, second=0, microsecond=0) - datetime.timedelta(days=1)
     else:
@@ -694,7 +694,7 @@ def _ensure_backup_dir():
 def create_backup():
     """立即创建一次数据库备份"""
     _ensure_backup_dir()
-    ts = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    ts = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8))).strftime('%Y%m%d_%H%M%S')
     filename = f'wms_{ts}.db'
     dest = os.path.join(BACKUP_DIR, filename)
     try:
