@@ -18,6 +18,19 @@ app.secret_key = os.environ.get('WMS_SECRET_KEY', 'wms_secret_key_2026')
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
 app.config['SESSION_COOKIE_HTTPONLY'] = True
+# 禁用静态文件缓存，确保每次部署后浏览器立即拉取最新 JS/CSS
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0
+
+@app.after_request
+def add_no_cache_headers(response):
+    # 只对静态文件禁用缓存
+    if request.path.startswith('/static/'):
+        response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+        response.headers['Pragma'] = 'no-cache'
+        response.headers['Expires'] = '0'
+    return response
+
+
 
 DB_PATH = os.path.join(os.path.dirname(__file__), 'wms.db')
 
