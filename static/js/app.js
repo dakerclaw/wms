@@ -4,6 +4,11 @@
 let _factories = [];
 let _factoriesLoaded = false;
 
+
+
+
+
+
 function showToast(msg, type = 'success', duration = 2500) {
   const t = document.getElementById('toast');
   t.textContent = msg;
@@ -257,7 +262,7 @@ function renderIbTable() {
       <td data-row="2"><input type="text" value="${escHtml(item.batch_no)}" oninput="ibItems[${i}].batch_no=this.value" placeholder="物料批号"></td>
       <td data-row="3"><input type="text" inputmode="numeric" pattern="[0-9]*" value="${escHtml(item.equipment)}" oninput="this.value=this.value.replace(/[^0-9]/g,'');ibItems[${i}].equipment=this.value" placeholder="设备"></td>
       <td data-row="3"><input type="text" inputmode="numeric" pattern="[0-9]*" value="${escHtml(item.package_no)}" oninput="this.value=this.value.replace(/[^0-9]/g,'');ibItems[${i}].package_no=this.value" placeholder="包号"></td>
-      <td data-row="3"><input type="text" inputmode="decimal" pattern="[0-9]*\.?[0-9]?" value="${item.weight||''}" oninput="this.value=this.value.replace(/[^0-9.]/g,'').replace(/(\..*)\./g,'$1').replace(/(\.\d)\d+/,'$1');if(parseFloat(this.value)>2000){this.value=this.value.endsWith('.')?'2000.':'2000';}ibItems[${i}].weight=parseFloat(this.value)||0" placeholder="质量(kg)"></td>
+      <td data-row="3"><input type="number" step="any" min="0" value="${item.weight||''}" oninput="ibItems[${i}].weight=parseFloat(this.value)||0" placeholder="质量(kg)"></td>
       <td data-row="1"><button class="btn btn-danger btn-sm" onclick="removeIbRow(${i})">删</button></td>
     </tr>
   `).join('');
@@ -459,7 +464,7 @@ function renderObTable() {
       <td data-row="2"><input type="text" value="${escHtml(item.batch_no)}" oninput="obItems[${i}].batch_no=this.value" placeholder="物料批号"></td>
       <td data-row="3"><input type="text" inputmode="numeric" pattern="[0-9]*" value="${escHtml(item.equipment)}" oninput="this.value=this.value.replace(/[^0-9]/g,'');obItems[${i}].equipment=this.value" placeholder="设备"></td>
       <td data-row="3"><input type="text" inputmode="numeric" pattern="[0-9]*" value="${escHtml(item.package_no)}" oninput="this.value=this.value.replace(/[^0-9]/g,'');obItems[${i}].package_no=this.value" placeholder="包号"></td>
-      <td data-row="3"><input type="text" inputmode="decimal" pattern="[0-9]*\.?[0-9]?" value="${item.weight||''}" oninput="this.value=this.value.replace(/[^0-9.]/g,'').replace(/(\..*)\./g,'$1').replace(/(\.\d)\d+/,'$1');if(parseFloat(this.value)>2000){this.value=this.value.endsWith('.')?'2000.':'2000';}obItems[${i}].weight=parseFloat(this.value)||0" placeholder="质量(kg)"></td>
+      <td data-row="3"><input type="number" step="any" min="0" value="${item.weight||''}" oninput="obItems[${i}].weight=parseFloat(this.value)||0" placeholder="质量(kg)"></td>
       <td data-row="1"><button class="btn btn-danger btn-sm" onclick="removeObRow(${i})">删</button></td>
     </tr>
   `).join('');
