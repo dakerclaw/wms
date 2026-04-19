@@ -11,7 +11,7 @@
 
 # 版本一：普通用户部署（推荐）
 
-> 以下步骤以**普通用户**（如 `mymac`）登录服务器执行，仅在需要系统级操作时使用 `sudo`。
+> 以下步骤以**普通用户**（如 `mac`）登录服务器执行，仅在需要系统级操作时使用 `sudo`。
 
 ## 一、全新安装
 
@@ -82,9 +82,9 @@ sudo supervisorctl update
 sudo supervisorctl status wms
 ```
 
-应显示 `RUNNING`或 `STARTING`。
+应显示 `RUNNING`。
 
-> **注意**：`<<EOF`（不加引号）才能让 shell 替换 `$USER`。如果替换失败，请直接将 `user=$USER` 改为你的用户名（如 `user=mymac`）。
+> **注意**：`<<EOF`（不加引号）才能让 shell 替换 `$USER`。如果替换失败，请直接将 `user=$USER` 改为你的用户名（如 `user=mac`）。
 
 ### 7. 防火墙放行
 
@@ -239,7 +239,7 @@ supervisorctl update
 supervisorctl status wms
 ```
 
-应显示 `RUNNING`或 `STARTING`。
+应显示 `RUNNING`。
 
 ### 7. 防火墙放行
 

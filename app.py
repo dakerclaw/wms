@@ -564,6 +564,61 @@ def query_inbound():
 
 
 # ===== 出库 =====
+
+def _check_stock(conn, items):
+    """
+    校验条目列表的库存状态。
+    返回 (in_stock_items, no_stock_items) 两个列表，每项附加 list_no 字段。
+    规则：list_no 在 inbound_items 中存在，且尚未被任何 outbound_items 引用，视为有库存。
+    """
+    in_stock = []
+    no_stock = []
+    for item in items:
+        list_no = f"{item['batch_no']}-{item['equipment']}-{item['package_no']}"
+        item_with_ln = dict(item)
+        item_with_ln['list_no'] = list_no
+        # 入库中存在该 list_no
+        ib = conn.execute(
+            "SELECT id FROM inbound_items WHERE list_no=? LIMIT 1", (list_no,)
+        ).fetchone()
+        if not ib:
+            no_stock.append(item_with_ln)
+            continue
+        # 是否已被出库
+        ob = conn.execute(
+            "SELECT id FROM outbound_items WHERE list_no=? LIMIT 1", (list_no,)
+        ).fetchone()
+        if ob:
+            no_stock.append(item_with_ln)
+        else:
+            in_stock.append(item_with_ln)
+    return in_stock, no_stock
+
+
+@app.route('/api/outbound/check', methods=['POST'])
+@require_login
+def check_outbound_stock():
+    """出库前库存校验：返回有库存和无库存的条目列表"""
+    data = request.json
+    if not data:
+        return jsonify({'code': 400, 'msg': '请求格式错误'})
+    items = data.get('items', [])
+    if not items:
+        return jsonify({'code': 400, 'msg': '条目不能为空'})
+    conn = get_db()
+    try:
+        in_stock, no_stock = _check_stock(conn, items)
+        return jsonify({
+            'code': 200,
+            'in_stock': in_stock,
+            'no_stock': no_stock,
+            'in_stock_count': len(in_stock),
+            'no_stock_count': len(no_stock)
+        })
+    finally:
+        conn.close()
+
+
 @app.route('/api/outbound', methods=['POST'])
 @require_login
 def create_outbound():
@@ -575,19 +630,32 @@ def create_outbound():
     items = data.get('items', [])
     if not factory or not trip or not items:
         return jsonify({'code': 400, 'msg': '参数不完整'})
-    order_no = gen_order_no('CK')
     conn = get_db()
     try:
+        # 再次校验库存（防止并发或前端绕过）
+        in_stock, no_stock = _check_stock(conn, items)
+        if not in_stock:
+            return jsonify({'code': 400, 'msg': '所有条目均无库存，无法出库'})
+        order_no = gen_order_no('CK')
         conn.execute("INSERT INTO outbound_orders (order_no, factory, trip, operator) VALUES (?,?,?,?)",
                      (order_no, factory, trip, session['user']))
-        for idx, item in enumerate(items):
-            list_no = f"{item['batch_no']}-{item['equipment']}-{item['package_no']}"
+        for idx, item in enumerate(in_stock):
             conn.execute(
                 "INSERT INTO outbound_items (order_no, seq, batch_no, equipment, package_no, list_no, weight) VALUES (?,?,?,?,?,?,?)",
-                (order_no, idx + 1, item['batch_no'], item['equipment'], item['package_no'], list_no, item['weight'])
+                (order_no, idx + 1, item['batch_no'], item['equipment'], item['package_no'], item['list_no'], item['weight'])
             )
         conn.commit()
-        return jsonify({'code': 200, 'msg': '出库成功', 'order_no': order_no})
+        msg = f'出库成功，共 {len(in_stock)} 条'
+        if no_stock:
+            msg += f'；{len(no_stock)} 条无库存已跳过'
+        return jsonify({
+            'code': 200,
+            'msg': msg,
+            'order_no': order_no,
+            'in_stock_count': len(in_stock),
+            'no_stock_count': len(no_stock),
+            'no_stock': no_stock
+        })
     except Exception as e:
         return jsonify({'code': 500, 'msg': f'出库失败：{str(e)}'}), 500
     finally:
