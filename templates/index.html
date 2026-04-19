@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>物料管理系统</title>
-<link rel="stylesheet" href="/static/css/style.css?v=20260419a">
+<link rel="stylesheet" href="/static/css/style.css?v=20260419c">
+
+
 
 
 
@@ -74,6 +76,11 @@
         <div class="icon">🔎</div>
         <h3>出库查询</h3>
         <p>按时间、厂区、车次、批号查询出库记录</p>
+      </div>
+      <div class="menu-card" onclick="showPage('page-inventory')">
+        <div class="icon">📦</div>
+        <h3>库存查询</h3>
+        <p>查看当前库存，可修改物料信息</p>
       </div>
     </div>
     <!-- 管理员专属 -->
@@ -523,6 +530,101 @@
   </div>
 </div>
 
+<!-- ==================== 库存查询 ==================== -->
+<div class="page" id="page-inventory">
+  <div class="content-wrap">
+    <div class="page-header">
+      <button class="back-btn" onclick="showPage('page-menu')">←</button>
+      <h2>库存查询</h2>
+    </div>
+    <div class="card">
+      <div class="card-title">查询条件</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>物料批次</label>
+          <input type="text" class="form-control" id="inv-batch" placeholder="模糊搜索">
+        </div>
+        <div class="form-group">
+          <label>设备</label>
+          <input type="text" class="form-control" id="inv-equipment" placeholder="模糊搜索">
+        </div>
+        <div class="form-group">
+          <label>包号</label>
+          <input type="text" class="form-control" id="inv-package" placeholder="模糊搜索">
+        </div>
+      </div>
+      <div class="query-actions" style="display:flex;justify-content:flex-end;margin-top:4px;gap:8px;">
+        <button class="btn btn-default" onclick="clearInvQuery()">清空</button>
+        <button class="btn btn-primary" onclick="queryInventory()">🔍 查询</button>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-title">库存列表 <span id="inv-count" style="font-size:13px;font-weight:normal;color:#888;"></span></div>
+      <div class="result-table-wrap">
+        <table class="result-table">
+          <thead>
+            <tr>
+              <th>物料批次</th>
+              <th>设备</th>
+              <th>包号</th>
+              <th>清单包号</th>
+              <th>质量（kg）</th>
+              <th>厂区</th>
+              <th>包装形式</th>
+              <th>入库时间</th>
+              <th>操作</th>
+            </tr>
+          </thead>
+          <tbody id="inv-tbody">
+            <tr><td colspan="9" class="no-data">请输入条件后点击查询，或直接查询全部库存</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 库存编辑弹窗 -->
+<div class="confirm-overlay" id="inv-edit-overlay" style="z-index:1050;">
+  <div class="confirm-modal" style="width:480px;">
+    <h3>✏️ 修改库存条目</h3>
+    <input type="hidden" id="inv-edit-id">
+    <div class="form-row" style="margin-top:16px;">
+      <div class="form-group">
+        <label>物料批次</label>
+        <input type="text" class="form-control" id="inv-edit-batch" placeholder="物料批次">
+      </div>
+      <div class="form-group">
+        <label>设备</label>
+        <input type="text" class="form-control" id="inv-edit-equipment" placeholder="设备">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>包号</label>
+        <input type="text" class="form-control" id="inv-edit-package" placeholder="包号">
+      </div>
+      <div class="form-group">
+        <label>质量（kg）</label>
+        <input type="number" step="any" min="0" class="form-control" id="inv-edit-weight" placeholder="质量">
+      </div>
+    </div>
+    <div class="form-group" style="margin-top:8px;">
+      <label>厂区</label>
+      <select class="form-control" id="inv-edit-factory">
+        <!-- 由 JS 动态加载 -->
+      </select>
+    </div>
+    <p style="font-size:12px;color:#fa8c16;margin-top:8px;">
+      ⚠️ 修改批次/设备/包号会同步更新清单包号；厂区修改将作用于该条目所属的整个入库单。
+    </p>
+    <div class="modal-actions" style="display:flex;justify-content:flex-end;gap:12px;margin-top:20px;">
+      <button class="btn btn-default" onclick="closeInvEdit()">取消</button>
+      <button class="btn btn-primary" onclick="saveInvEdit()">保存</button>
+    </div>
+  </div>
+</div>
+
 <!-- ==================== 账号管理 ==================== -->
 <div class="page" id="page-user-manage">
   <div class="content-wrap">
@@ -756,6 +858,6 @@
   </div>
 </div>
 
-<script src="/static/js/app.js?v=20260419a"></script>
+<script src="/static/js/app.js?v=20260419c"></script>
 </body>
 </html>
