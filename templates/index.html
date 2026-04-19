@@ -4,7 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>物料管理系统</title>
-<link rel="stylesheet" href="/static/css/style.css?v=20260414h">
+<link rel="stylesheet" href="/static/css/style.css?v=20260419a">
+
 
 
 
@@ -412,6 +413,27 @@
   </div>
 </div>
 
+<!-- 出库无库存提醒弹窗 -->
+<div class="confirm-overlay" id="ob-stock-warn-overlay" style="z-index:1050;">
+  <div class="confirm-modal" style="width:480px;">
+    <h3>⚠️ 部分条目无库存</h3>
+    <p style="margin-top:10px;font-size:13px;color:#555;line-height:1.8;">
+      以下条目在入库记录中<strong style="color:#ff4d4f;">不存在或已出库</strong>，无法出库：
+    </p>
+    <div class="result-table-wrap" style="max-height:200px;overflow-y:auto;margin:10px 0;">
+      <table class="result-table">
+        <thead><tr><th>清单包号</th><th>原因</th></tr></thead>
+        <tbody id="ob-no-stock-tbody"></tbody>
+      </table>
+    </div>
+    <p id="ob-stock-warn-tip" style="font-size:13px;color:#333;margin-top:8px;"></p>
+    <div class="modal-actions" style="display:flex;justify-content:flex-end;gap:12px;margin-top:20px;">
+      <button class="btn btn-default" onclick="closeObStockWarn()">取消</button>
+      <button class="btn btn-success" id="ob-stock-warn-ok" onclick="doSubmitOutbound()">仅出库有库存的条目</button>
+    </div>
+  </div>
+</div>
+
 <!-- ==================== 出库查询 ==================== -->
 <div class="page" id="page-outbound-query">
   <div class="content-wrap">
@@ -734,6 +756,6 @@
   </div>
 </div>
 
-<script src="/static/js/app.js?v=20260414h"></script>
+<script src="/static/js/app.js?v=20260419a"></script>
 </body>
 </html>
