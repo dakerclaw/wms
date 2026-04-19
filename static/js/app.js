@@ -539,10 +539,56 @@ function closeObConfirm() {
 async function submitOutbound() {
   const factory = document.querySelector('input[name="ob-factory"]:checked')?.value || '';
   const trip = document.getElementById('ob-trip').value.trim();
+
+  // 先校验库存
+  const checkRes = await api('POST', '/api/outbound/check', { items: obItems });
+  if (checkRes.code !== 200) {
+    showToast(checkRes.msg || '库存校验失败', 'error');
+    return;
+  }
+
+  if (checkRes.no_stock_count > 0) {
+    // 有无库存条目，弹窗提醒
+    const tbody = document.getElementById('ob-no-stock-tbody');
+    tbody.innerHTML = checkRes.no_stock.map(item => {
+      const listNo = item.list_no || `${item.batch_no}-${item.equipment}-${item.package_no}`;
+      const reason = checkRes.in_stock.length === 0 ? '未入库或已出库' : '未入库或已出库';
+      return `<tr><td>${escHtml(listNo)}</td><td style="color:#ff4d4f;">${reason}</td></tr>`;
+    }).join('');
+
+    const tip = document.getElementById('ob-stock-warn-tip');
+    if (checkRes.in_stock_count > 0) {
+      tip.innerHTML = `有库存：<strong style="color:#52c41a;">${checkRes.in_stock_count} 条</strong>，无库存：<strong style="color:#ff4d4f;">${checkRes.no_stock_count} 条</strong>。点击下方按钮可仅出库有库存的条目。`;
+      document.getElementById('ob-stock-warn-ok').style.display = '';
+    } else {
+      tip.innerHTML = `<strong style="color:#ff4d4f;">所有条目均无库存</strong>，无法出库，请检查物料录入是否正确。`;
+      document.getElementById('ob-stock-warn-ok').style.display = 'none';
+    }
+
+    document.getElementById('ob-stock-warn-overlay').classList.add('show');
+    return;
+  }
+
+  // 全部有库存，直接提交
+  await doSubmitOutbound();
+}
+
+function closeObStockWarn() {
+  document.getElementById('ob-stock-warn-overlay').classList.remove('show');
+}
+
+async function doSubmitOutbound() {
+  closeObStockWarn();
+  const factory = document.querySelector('input[name="ob-factory"]:checked')?.value || '';
+  const trip = document.getElementById('ob-trip').value.trim();
   const res = await api('POST', '/api/outbound', { factory, trip, items: obItems });
   if (res.code === 200) {
     closeObConfirm();
-    showToast(`出库成功！单号：${res.order_no}`, 'success', 4000);
+    let msg = `出库成功！单号：${res.order_no}`;
+    if (res.no_stock_count > 0) {
+      msg += `\n（${res.no_stock_count} 条无库存已跳过）`;
+    }
+    showToast(msg, 'success', 5000);
     initObPage();
     showPage('page-menu');
   } else {
