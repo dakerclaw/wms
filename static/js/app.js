@@ -27,6 +27,7 @@ function showPage(id) {
   if (id === 'page-inbound-query') initIbQueryPage();
   if (id === 'page-outbound-query') initObQueryPage();
   if (id === 'page-overview') loadOverview();
+  if (id === 'page-inventory') initInventoryPage();
 }
 
 // ===================== 厂区公共加载 =====================
@@ -800,7 +801,108 @@ function deleteFactory(id, name) {
   });
 }
 
+// ===================== 库存查询 =====================
+
+async function initInventoryPage() {
+  await loadFactoriesCache();
+  renderFactorySelect('inv-edit-factory');
+  // 清空查询条件和结果，等待用户手动查询
+  document.getElementById('inv-batch').value = '';
+  document.getElementById('inv-equipment').value = '';
+  document.getElementById('inv-package').value = '';
+  document.getElementById('inv-tbody').innerHTML = '<tr><td colspan="9" class="no-data">请输入查询条件后点击查询</td></tr>';
+  document.getElementById('inv-count').textContent = '';
+}
+
+async function queryInventory() {
+  const batch = document.getElementById('inv-batch').value.trim();
+  const equipment = document.getElementById('inv-equipment').value.trim();
+  const pkg = document.getElementById('inv-package').value.trim();
+  const params = new URLSearchParams({ batch_no: batch, equipment, package_no: pkg });
+  const res = await api('GET', `/api/inventory?${params}`);
+  const tbody = document.getElementById('inv-tbody');
+  const countEl = document.getElementById('inv-count');
+  if (res.code !== 200) {
+    tbody.innerHTML = `<tr><td colspan="9" class="no-data">查询失败：${escHtml(res.msg || '未知错误')}</td></tr>`;
+    countEl.textContent = '';
+    return;
+  }
+  const data = res.data || [];
+  countEl.textContent = data.length ? `共 ${data.length} 条` : '';
+  if (!data.length) {
+    tbody.innerHTML = '<tr><td colspan="9" class="no-data">暂无库存记录</td></tr>';
+    return;
+  }
+  tbody.innerHTML = data.map(item => `
+    <tr>
+      <td>${escHtml(item.batch_no)}</td>
+      <td>${escHtml(item.equipment)}</td>
+      <td>${escHtml(item.package_no)}</td>
+      <td>${escHtml(item.list_no)}</td>
+      <td>${item.weight}</td>
+      <td>${escHtml(item.factory)}</td>
+      <td>${escHtml(item.package_type || '-')}</td>
+      <td>${item.inbound_time || ''}</td>
+      <td><button class="btn btn-primary btn-sm" onclick="openInvEdit(${item.id},'${escHtml(item.batch_no)}','${escHtml(item.equipment)}','${escHtml(item.package_no)}',${item.weight},'${escHtml(item.factory)}')">修改</button></td>
+    </tr>
+  `).join('');
+}
+
+function clearInvQuery() {
+  document.getElementById('inv-batch').value = '';
+  document.getElementById('inv-equipment').value = '';
+  document.getElementById('inv-package').value = '';
+  queryInventory();
+}
+
+function openInvEdit(id, batch, equipment, packageNo, weight, factory) {
+  document.getElementById('inv-edit-id').value = id;
+  document.getElementById('inv-edit-batch').value = batch;
+  document.getElementById('inv-edit-equipment').value = equipment;
+  document.getElementById('inv-edit-package').value = packageNo;
+  document.getElementById('inv-edit-weight').value = weight;
+  // 加载厂区选项后设置当前值
+  loadFactoriesCache().then(() => {
+    renderFactorySelect('inv-edit-factory');
+    document.getElementById('inv-edit-factory').value = factory;
+  });
+  document.getElementById('inv-edit-overlay').classList.add('show');
+}
+
+function closeInvEdit() {
+  document.getElementById('inv-edit-overlay').classList.remove('show');
+}
+
+async function saveInvEdit() {
+  const id = document.getElementById('inv-edit-id').value;
+  const batch_no = document.getElementById('inv-edit-batch').value.trim();
+  const equipment = document.getElementById('inv-edit-equipment').value.trim();
+  const package_no = document.getElementById('inv-edit-package').value.trim();
+  const weight = parseFloat(document.getElementById('inv-edit-weight').value);
+  const factory = document.getElementById('inv-edit-factory').value;
+
+  if (!batch_no || !equipment || !package_no) {
+    showToast('批次、设备、包号不能为空', 'error'); return;
+  }
+  if (isNaN(weight) || weight < 0) {
+    showToast('质量格式错误', 'error'); return;
+  }
+  if (!factory) {
+    showToast('请选择厂区', 'error'); return;
+  }
+
+  const res = await api('PUT', `/api/inventory/${id}`, { batch_no, equipment, package_no, weight, factory });
+  if (res.code === 200) {
+    showToast('修改成功', 'success');
+    closeInvEdit();
+    queryInventory();
+  } else {
+    showToast(res.msg || '修改失败', 'error');
+  }
+}
+
 // ===================== 账号管理 =====================
+
 async function loadUsers() {
   const res = await api('GET', '/api/users');
   const tbody = document.getElementById('um-tbody');
