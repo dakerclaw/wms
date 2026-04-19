@@ -4,7 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>物料管理系统</title>
-<link rel="stylesheet" href="/static/css/style.css?v=20260419c">
+<link rel="stylesheet" href="/static/css/style.css?v=20260419e">
+
+
 
 
 
@@ -82,15 +84,15 @@
         <h3>库存查询</h3>
         <p>查看当前库存，可修改物料信息</p>
       </div>
+      <div class="menu-card" onclick="showPage('page-overview')">
+        <div class="icon">📊</div>
+        <h3>数据概览</h3>
+        <p>昨日入库与今日出库快速汇总</p>
+      </div>
     </div>
     <!-- 管理员专属 -->
     <div id="admin-menu-card" style="display:none;margin-top:24px;">
       <div style="display:flex;gap:16px;flex-wrap:wrap;justify-content:center;">
-        <div class="menu-card" style="border:2px dashed #722ed1;" onclick="showPage('page-overview')">
-          <div class="icon">📊</div>
-          <h3>数据概览</h3>
-          <p>昨日入库与今日出库快速汇总</p>
-        </div>
         <div class="menu-card" style="border:2px dashed #eb2f96;" onclick="showPage('page-factory-manage')">
           <div class="icon">🏭</div>
           <h3>厂区管理</h3>
@@ -858,6 +860,6 @@
   </div>
 </div>
 
-<script src="/static/js/app.js?v=20260419c"></script>
+<script src="/static/js/app.js?v=20260419e"></script>
 </body>
 </html>
