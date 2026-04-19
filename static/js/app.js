@@ -72,10 +72,10 @@ function renderFactoryRadio(containerId, radioName, checkedName) {
 function renderFactorySelect(selectId) {
   const sel = document.getElementById(selectId);
   if (!sel) return;
-  // 保留第一个 option（"全部"）
+  // 保留第一个 option（如"全部"/"请选择"），若无则直接重建
   const firstOpt = sel.options[0];
   sel.innerHTML = '';
-  sel.appendChild(firstOpt);
+  if (firstOpt) sel.appendChild(firstOpt);
   _factories.forEach(f => {
     const opt = document.createElement('option');
     opt.value = f.name;
