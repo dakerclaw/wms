@@ -411,7 +411,7 @@ def import_users():
 
 # ===== 概览 =====
 @app.route('/api/overview', methods=['GET'])
-@require_admin
+@require_login
 def overview():
     # 始终使用北京时间 UTC+8
     now = datetime.datetime.now(datetime.timezone(datetime.timedelta(hours=8)))
