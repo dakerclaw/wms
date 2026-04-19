@@ -563,6 +563,124 @@ def query_inbound():
         conn.close()
 
 
+# ===== 库存查询与修改 =====
+
+@app.route('/api/inventory', methods=['GET'])
+@require_login
+def query_inventory():
+    """库存查询：入库中存在且尚未出库的条目"""
+    batch_no = request.args.get('batch_no', '').strip()
+    equipment = request.args.get('equipment', '').strip()
+    package_no = request.args.get('package_no', '').strip()
+
+    sql = '''
+        SELECT ii.id, ii.order_no, ii.seq, ii.batch_no, ii.equipment,
+               ii.package_no, ii.list_no, ii.weight,
+               io.factory, io.package_type, io.created_at as inbound_time
+        FROM inbound_items ii
+        JOIN inbound_orders io ON ii.order_no = io.order_no
+        WHERE ii.list_no NOT IN (SELECT list_no FROM outbound_items)
+    '''
+    params = []
+    if batch_no:
+        sql += ' AND ii.batch_no LIKE ?'
+        params.append(f'%{batch_no}%')
+    if equipment:
+        sql += ' AND ii.equipment LIKE ?'
+        params.append(f'%{equipment}%')
+    if package_no:
+        sql += ' AND ii.package_no LIKE ?'
+        params.append(f'%{package_no}%')
+    sql += ' ORDER BY ii.id DESC LIMIT 500'
+
+    conn = get_db()
+    try:
+        rows = conn.execute(sql, params).fetchall()
+        result = []
+        for r in rows:
+            result.append({
+                'id': r['id'],
+                'order_no': r['order_no'],
+                'batch_no': r['batch_no'],
+                'equipment': r['equipment'],
+                'package_no': r['package_no'],
+                'list_no': r['list_no'],
+                'weight': r['weight'],
+                'factory': r['factory'],
+                'package_type': r['package_type'] or '',
+                'inbound_time': r['inbound_time']
+            })
+        return jsonify({'code': 200, 'data': result, 'total': len(result)})
+    finally:
+        conn.close()
+
+
+@app.route('/api/inventory/<int:item_id>', methods=['PUT'])
+@require_login
+def update_inventory(item_id):
+    """库存修改：修改单条入库明细的批号/设备/包号/质量；同时联动修改入库单的厂区"""
+    data = request.json
+    if not data:
+        return jsonify({'code': 400, 'msg': '请求格式错误'})
+
+    batch_no = data.get('batch_no', '').strip()
+    equipment = data.get('equipment', '').strip()
+    package_no = data.get('package_no', '').strip()
+    weight = data.get('weight')
+    factory = data.get('factory', '').strip()
+
+    if not batch_no or not equipment or not package_no or weight is None or not factory:
+        return jsonify({'code': 400, 'msg': '参数不完整'})
+
+    try:
+        weight = float(weight)
+        if weight < 0:
+            return jsonify({'code': 400, 'msg': '质量不能为负数'})
+    except (ValueError, TypeError):
+        return jsonify({'code': 400, 'msg': '质量格式错误'})
+
+    new_list_no = f"{batch_no}-{equipment}-{package_no}"
+
+    conn = get_db()
+    try:
+        # 获取当前记录
+        row = conn.execute(
+            'SELECT id, order_no, list_no FROM inbound_items WHERE id=?', (item_id,)
+        ).fetchone()
+        if not row:
+            return jsonify({'code': 404, 'msg': '记录不存在'})
+
+        old_list_no = row['list_no']
+        order_no = row['order_no']
+
+        # 如果 list_no 有变化，检查新 list_no 是否与其他入库记录冲突
+        if new_list_no != old_list_no:
+            conflict = conn.execute(
+                'SELECT id FROM inbound_items WHERE list_no=? AND id!=?', (new_list_no, item_id)
+            ).fetchone()
+            if conflict:
+                return jsonify({'code': 409, 'msg': f'清单包号 {new_list_no} 已存在，请检查批号/设备/包号是否重复'})
+
+        # 更新入库明细
+        conn.execute(
+            'UPDATE inbound_items SET batch_no=?, equipment=?, package_no=?, list_no=?, weight=? WHERE id=?',
+            (batch_no, equipment, package_no, new_list_no, weight, item_id)
+        )
+
+        # 更新厂区（仅修改该入库单的厂区，而不影响同单其他条目）
+        conn.execute(
+            'UPDATE inbound_orders SET factory=? WHERE order_no=?',
+            (factory, order_no)
+        )
+
+        conn.commit()
+        return jsonify({'code': 200, 'msg': '修改成功', 'list_no': new_list_no})
+    except Exception as e:
+        return jsonify({'code': 500, 'msg': f'修改失败：{str(e)}'}), 500
+    finally:
+        conn.close()
+
+
 # ===== 出库 =====
 
 def _check_stock(conn, items):
