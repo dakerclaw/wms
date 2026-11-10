@@ -4,8 +4,78 @@
 
 根据你的服务器登录方式，选择对应版本：
 
-- 👤 **[普通用户部署（推荐）](#版本一普通用户部署推荐)**
-- 🔴 **[Root 用户部署](#版本二root-用户部署)**
+- ⚡ **[一键脚本（推荐）](#一键脚本推荐)** —— 安装 / 更新 / 卸载各一条命令
+- 👤 **[普通用户部署](#版本一普通用户部署推荐)** —— 手工分步
+- 🔴 **[Root 用户部署](#版本二root-用户部署)** —— 手工分步
+
+---
+
+# 一键脚本（推荐）
+
+`install.sh` 使用 **systemd + gunicorn** 守护服务，自动完成依赖安装、克隆、虚拟环境、服务注册、防火墙放行与健康检查。
+
+## 一、安装
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dakerclaw/wms/main/install.sh | sudo bash -s -- install
+```
+
+自定义端口 / 目录：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dakerclaw/wms/main/install.sh | sudo bash -s -- install --port 8080 --app-dir /opt/wms
+```
+
+也可以先下载再执行：
+
+```bash
+curl -fsSLO https://raw.githubusercontent.com/dakerclaw/wms/main/install.sh
+chmod +x install.sh
+sudo ./install.sh install
+```
+
+安装完成后访问 `http://<服务器IP>:5000`，默认账号 **admin / admin001**（请立即修改）。
+
+## 二、更新
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dakerclaw/wms/main/install.sh | sudo bash -s -- update
+```
+
+或已在项目目录内：
+
+```bash
+cd /opt/wms && sudo ./install.sh update
+```
+
+更新流程会自动：**备份数据库**（`sqlite3 backup`，WAL 下安全）→ `git pull`（有本地改动会自动 stash）→
+更新依赖 → 重启服务 → 健康检查。若已是最新版本则直接跳过重启。
+
+## 三、卸载
+
+```bash
+# 卸载但保留数据库（备份到 /root/wms_data_<时间戳>/）
+curl -fsSL https://raw.githubusercontent.com/dakerclaw/wms/main/install.sh | sudo bash -s -- uninstall
+
+# 彻底删除（含数据库与备份，不可恢复）
+curl -fsSL https://raw.githubusercontent.com/dakerclaw/wms/main/install.sh | sudo bash -s -- uninstall --purge
+```
+
+## 四、脚本说明
+
+| 项目 | 说明 |
+|------|------|
+| 安装参数 | 记录在 `/etc/wms/install.conf`，`update`/`uninstall` 自动读取，无需重复传参 |
+| 服务名 | `wms.service`，`systemctl {start,stop,restart,status} wms` |
+| 日志 | `journalctl -u wms -f` |
+| 端口 | 默认 `5000`，可用 `--port` 指定；安装时自动用 ufw 放行（若 ufw 已启用） |
+| 数据库 | 位于 `<app-dir>/wms.db`，`update` 前自动备份到 `<app-dir>/backup/` |
+| 安全 | 自动生成随机 `.secret_key` 并注入 systemd 环境变量，重启不失效 |
+| 重复执行 | 对已存在的安装再次执行 `install` 会自动转为 `update` |
+| 前置要求 | root 权限、systemd、apt 系发行版（Debian/Ubuntu） |
+
+> 若目标目录非空且不是 WMS 仓库，脚本会**拒绝继续**，避免误覆盖他人文件。
+> 若机器没有 systemd（容器/WSL），请使用下面的手工部署步骤。
 
 ---
 
