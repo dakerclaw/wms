@@ -354,7 +354,36 @@ PY
 
 # ---------- 命令：help ----------
 cmd_help() {
-  sed -n '2,20p' "$0" | sed 's/^# \{0,1\}//'
+  cat <<'USAGE'
+WMS 物料管理系统 —— 一键安装 / 更新 / 卸载脚本
+  https://github.com/dakerclaw/wms
+
+用法：
+  sudo ./install.sh install  [--port 5000] [--app-dir /opt/wms]
+  sudo ./install.sh update
+  sudo ./install.sh uninstall [--purge]
+
+命令：
+  install     全新安装（已存在安装则自动转为 update）
+  update      拉取最新代码并重启（自动备份数据库）
+  uninstall   卸载服务与应用目录
+              --purge  同时彻底删除数据库与备份（默认保留到 /root/wms_data_<时间戳>/）
+
+参数：
+  --port N      监听端口，默认 5000
+  --app-dir P   应用目录，默认 /opt/wms
+
+一行命令安装：
+  curl -fsSL https://raw.githubusercontent.com/dakerclaw/wms/main/install.sh | sudo bash -s -- install
+
+环境变量（一般无需设置）：
+  WMS_REPO       源码仓库地址
+  WMS_CONF_DIR   配置目录，默认 /etc/wms
+  WMS_SERVICE    systemd 服务名，默认 wms
+  WMS_APP_DIR    默认应用目录，默认 /opt/wms
+
+要求：root 权限 + systemd + apt 系发行版（Debian/Ubuntu）
+USAGE
 }
 
 # ---------- 入口 ----------
