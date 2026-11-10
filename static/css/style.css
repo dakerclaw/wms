@@ -439,50 +439,58 @@ select.form-control { appearance: none; background-image: url("data:image/svg+xm
     font-size: 13px;
     border: none;
   }
-  /* 第一行：序号 + 删除按钮，均匀布置 */
-  .entry-table td[data-row="1"] {
-    flex: 1;
-    min-width: 0;
-    display: flex;
-    align-items: center;
-  }
+
+  /* ===== 第一行：序号 + 物料批号（同一行） ===== */
   .entry-table td[data-row="1"].td-no {
-    /* 序号独占宽度：至少能放下 3 位数，避免被同行的输入框挤压/遮挡 */
+    order: 1;
     flex: 0 0 auto;
-    width: auto;
-    min-width: 3.2em;
-    justify-content: flex-start;
+    min-width: 2.2em;
+    max-width: 2.2em;
+    justify-content: center;
     background: none;
     color: #1a3a5c;
-    border-radius: 10px;
-    padding: 8px 10px;
+    padding: 8px 0;
     font-size: 14px;
     font-weight: 600;
     font-variant-numeric: tabular-nums;
     white-space: nowrap;
   }
-  /* 序号与删除按钮之间：删除按钮靠右，中间留白，避免序号被拉长 */
+  .entry-table td[data-row="2"] {
+    order: 2;
+    flex: 1 1 0;
+    min-width: 0;
+    padding: 8px 10px 8px 6px;
+  }
+  /* 换行锚点：JS 在"批号"之后插入的空 td，撑满整行宽度，强制后续元素换行 */
+  .entry-table td.row-break {
+    order: 2;
+    flex: 0 0 100%;
+    height: 0;
+    padding: 0;
+    margin: 0;
+    border: none;
+  }
+
+  /* ===== 第二行：设备 + 包号 + 质量 + 删除（与原始等分一致） ===== */
+  .entry-table td[data-row="3"] {
+    order: 3;
+    flex: 1 1 0;
+    min-width: 0;
+    border-top: 1px solid #eef1f5;
+  }
+  .entry-table td[data-row="3"].td-no { display: none; }
+  /* 删除按钮：第二行最右，不参与等分 */
   .entry-table td[data-row="1"]:not(.td-no) {
+    order: 4;
+    flex: 0 0 auto;
     justify-content: flex-end;
+    padding: 8px 10px;
+    border-top: 1px solid #eef1f5;
   }
   .entry-table td[data-row="1"] .btn {
     flex-shrink: 0;
     justify-content: center;
   }
-  /* 第二行：物料批号，单独一行 */
-  .entry-table td[data-row="2"] {
-    width: 100%;
-    flex: 0 0 100%;
-    border-top: 1px solid #eef1f5;
-  }
-  .entry-table td[data-row="2"].td-no { display: none; }
-  /* 第三行：设备 + 包号 + 质量，均匀布置 */
-  .entry-table td[data-row="3"] {
-    flex: 1;
-    min-width: 0;
-    border-top: 1px solid #eef1f5;
-  }
-  .entry-table td[data-row="3"].td-no { display: none; }
   .entry-table td input[type="text"],
   .entry-table td input[type="number"] {
     flex: 1;

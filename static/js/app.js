@@ -275,9 +275,10 @@ function renderIbTable() {
     <tr>
       <td class="td-no" data-row="1">${i + 1}</td>
       <td data-row="2"><input type="text" value="${escHtml(item.batch_no)}" oninput="ibItems[${i}].batch_no=this.value" placeholder="物料批号"></td>
+      <td class="row-break" aria-hidden="true"></td>
       <td data-row="3"><input type="text" inputmode="numeric" pattern="[0-9]*" value="${escHtml(item.equipment)}" oninput="this.value=this.value.replace(/[^0-9]/g,'');ibItems[${i}].equipment=this.value" placeholder="设备"></td>
       <td data-row="3"><input type="text" inputmode="numeric" pattern="[0-9]*" value="${escHtml(item.package_no)}" oninput="this.value=this.value.replace(/[^0-9]/g,'');ibItems[${i}].package_no=this.value" placeholder="包号"></td>
-      <td data-row="3"><input type="number" step="any" min="0" value="${item.weight||''}" oninput="ibItems[${i}].weight=parseFloat(this.value)||0" placeholder="质量(kg)"></td>
+      <td data-row="3"><input type="number" step="any" min="0" value="${item.weight||''}" oninput="ibItems[${i}].weight=parseFloat(this.value)||0" placeholder="质量" title="质量（kg）"></td>
       <td data-row="1"><button class="btn btn-danger btn-sm" onclick="removeIbRow(${i})">删</button></td>
     </tr>
   `).join('');
@@ -477,9 +478,10 @@ function renderObTable() {
     <tr>
       <td class="td-no" data-row="1">${i + 1}</td>
       <td data-row="2"><input type="text" value="${escHtml(item.batch_no)}" oninput="obItems[${i}].batch_no=this.value" placeholder="物料批号"></td>
+      <td class="row-break" aria-hidden="true"></td>
       <td data-row="3"><input type="text" inputmode="numeric" pattern="[0-9]*" value="${escHtml(item.equipment)}" oninput="this.value=this.value.replace(/[^0-9]/g,'');obItems[${i}].equipment=this.value" placeholder="设备"></td>
       <td data-row="3"><input type="text" inputmode="numeric" pattern="[0-9]*" value="${escHtml(item.package_no)}" oninput="this.value=this.value.replace(/[^0-9]/g,'');obItems[${i}].package_no=this.value" placeholder="包号"></td>
-      <td data-row="3"><input type="number" step="any" min="0" value="${item.weight||''}" oninput="obItems[${i}].weight=parseFloat(this.value)||0" placeholder="质量(kg)"></td>
+      <td data-row="3"><input type="number" step="any" min="0" value="${item.weight||''}" oninput="obItems[${i}].weight=parseFloat(this.value)||0" placeholder="质量" title="质量（kg）"></td>
       <td data-row="1"><button class="btn btn-danger btn-sm" onclick="removeObRow(${i})">删</button></td>
     </tr>
   `).join('');
