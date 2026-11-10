@@ -228,7 +228,7 @@ select.form-control { appearance: none; background-image: url("data:image/svg+xm
   vertical-align: middle;
 }
 .entry-table tr:hover td { background: #f8fbff; }
-.entry-table .td-no { color: #888; font-size: 13px; width: 48px; text-align: center; }
+.entry-table .td-no { color: #888; font-size: 13px; width: 56px; min-width: 56px; text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .entry-table input[type="text"],
 .entry-table input[type="number"] {
   width: 100%;
@@ -447,13 +447,23 @@ select.form-control { appearance: none; background-image: url("data:image/svg+xm
     align-items: center;
   }
   .entry-table td[data-row="1"].td-no {
+    /* 序号独占宽度：至少能放下 3 位数，避免被同行的输入框挤压/遮挡 */
+    flex: 0 0 auto;
+    width: auto;
+    min-width: 3.2em;
     justify-content: flex-start;
     background: none;
     color: #1a3a5c;
     border-radius: 10px;
-    padding: 0;
-    font-size: 12px;
-    flex-shrink: 0;
+    padding: 8px 10px;
+    font-size: 14px;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  /* 序号与删除按钮之间：删除按钮靠右，中间留白，避免序号被拉长 */
+  .entry-table td[data-row="1"]:not(.td-no) {
+    justify-content: flex-end;
   }
   .entry-table td[data-row="1"] .btn {
     flex-shrink: 0;
@@ -462,6 +472,7 @@ select.form-control { appearance: none; background-image: url("data:image/svg+xm
   /* 第二行：物料批号，单独一行 */
   .entry-table td[data-row="2"] {
     width: 100%;
+    flex: 0 0 100%;
     border-top: 1px solid #eef1f5;
   }
   .entry-table td[data-row="2"].td-no { display: none; }
