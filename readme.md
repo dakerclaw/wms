@@ -2,15 +2,16 @@
 
 > 仓库地址：`https://github.com/dakerclaw/wms`
 
-根据你的服务器登录方式，选择对应版本：
+根据你的服务器情况，选择对应方式：
 
-- ⚡ **[一键脚本（推荐）](#一键脚本推荐)** —— 安装 / 更新 / 卸载各一条命令
-- 👤 **[普通用户部署](#版本一普通用户部署推荐)** —— 手工分步
+- ⚡ **[Root 一键脚本 `install.sh`](#root-一键脚本推荐)** —— 装到 `/opt/wms`，system 级 systemd
+- 👤 **[普通用户一键脚本 `install-user.sh`](#普通用户一键脚本)** —— 装到 `~/apps/wms`，systemd --user，无需 root
+- 📖 **[普通用户部署](#版本一普通用户部署推荐)** —— 手工分步
 - 🔴 **[Root 用户部署](#版本二root-用户部署)** —— 手工分步
 
 ---
 
-# 一键脚本（推荐）
+# Root 一键脚本（推荐）
 
 `install.sh` 使用 **systemd + gunicorn** 守护服务，自动完成依赖安装、克隆、虚拟环境、服务注册、防火墙放行与健康检查。
 
@@ -76,6 +77,75 @@ curl -fsSL https://raw.githubusercontent.com/dakerclaw/wms/main/install.sh | sud
 
 > 若目标目录非空且不是 WMS 仓库，脚本会**拒绝继续**，避免误覆盖他人文件。
 > 若机器没有 systemd（容器/WSL），请使用下面的手工部署步骤。
+
+---
+
+# 普通用户一键脚本
+
+`install-user.sh` 面向**没有 root、或不想动系统目录**的场景：
+
+- 应用装在家目录（默认 `~/apps/wms`），不写 `/opt`
+- 服务用 **systemd --user** 守护，**不写 `/etc/systemd/system`**
+- 除「安装系统依赖」和「启用 linger」外，全程不需要 root（依赖齐全时连 sudo 都不用）
+
+## 一、安装
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dakerclaw/wms/main/install-user.sh | bash -s -- install
+```
+
+自定义端口 / 目录：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dakerclaw/wms/main/install-user.sh | bash -s -- install --port 8080 --app-dir ~/apps/wms
+```
+
+## 二、更新
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/dakerclaw/wms/main/install-user.sh | bash -s -- update
+```
+
+## 三、卸载
+
+```bash
+# 保留数据库（备份到 ~/wms_data_<时间戳>/）
+curl -fsSL https://raw.githubusercontent.com/dakerclaw/wms/main/install-user.sh | bash -s -- uninstall
+
+# 彻底删除
+curl -fsSL https://raw.githubusercontent.com/dakerclaw/wms/main/install-user.sh | bash -s -- uninstall --purge
+```
+
+## 四、脚本说明
+
+| 项目 | 说明 |
+|------|------|
+| 安装目录 | 默认 `~/apps/wms`，可用 `--app-dir` 指定 |
+| 安装参数 | 记录在 `<app-dir>/.install.conf`，`update`/`uninstall` 自动读取 |
+| 服务管理 | `systemctl --user {start,stop,restart,status} wms` |
+| 日志 | `journalctl --user -u wms -f` |
+| 端口 | 默认 `5000`，可用 `--port` 指定 |
+| 数据库 | `<app-dir>/wms.db`，`update` 前自动备份到 `<app-dir>/backup/` |
+| 重复执行 | 对已存在的安装再次执行 `install` 会自动转为 `update` |
+| 前置要求 | systemd + apt 系发行版（Debian/Ubuntu） |
+
+### ⚠️ 关于 systemd --user 的重要说明
+
+普通用户的 `systemd --user` 实例**只在登录会话期间存在**。若希望服务在退出 SSH 后继续运行、并开机自启，
+需要启用 linger（脚本会自动尝试，失败时会提示）：
+
+```bash
+sudo loginctl enable-linger $USER
+```
+
+若脚本报错「当前没有可用的 systemd --user 实例」，通常是：
+
+1. 未启用 linger，且当前不是交互式登录会话
+2. 登录方式不创建 user bus（如某些 `su -`、非登录 shell、容器）
+
+处理：先执行 `sudo loginctl enable-linger $USER`，然后**重新登录**再跑脚本。
+
+> 长期运行的生产环境更推荐用 root 版的 `install.sh`（系统级 systemd，无此限制）。
 
 ---
 
