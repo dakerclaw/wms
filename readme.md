@@ -345,7 +345,7 @@ curl -fsSL https://raw.githubusercontent.com/dakerclaw/wms/main/install-user.sh 
 
 #### 反向代理（可选）
 
-如需用 80/443 端口或绑定域名，用 nginx 反代到应用端口：
+如需用 80/443 端口或绑定域名，用 nginx 反代到应用端口。全部流量挂在根路径时：
 
 ```nginx
 server {
@@ -367,6 +367,47 @@ server {
 ```bash
 sudo nginx -t && sudo systemctl reload nginx
 ```
+
+#### 挂载到子路径（如 example.com/wms/）
+
+若域名根路径已被其他站点占用，可把 WMS 挂到子路径下。应用内置子路径支持，
+只需在 nginx 去掉前缀，并设置 `WMS_BASE_PATH`：
+
+**nginx 配置：**
+
+```nginx
+location = /wms { return 301 /wms/; }
+
+location /wms/ {
+    rewrite ^/wms/(.*)$ /$1 break;      # 去掉 /wms 前缀再转发
+    proxy_pass http://127.0.0.1:5000;
+    proxy_http_version 1.1;
+    proxy_set_header Host              $host;
+    proxy_set_header X-Real-IP         $remote_addr;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    client_max_body_size 20m;
+    proxy_read_timeout   300s;
+}
+```
+
+**应用设置**（让页面生成的静态资源与 API 地址带上 `/wms/` 前缀）：
+
+```bash
+# Root 方式
+sudo systemctl edit wms
+# 添加：
+[Service]
+Environment=WMS_BASE_PATH=/wms/
+
+sudo systemctl daemon-reload && sudo systemctl restart wms
+
+# 普通用户方式
+systemctl --user edit wms   # 同样加 Environment=WMS_BASE_PATH=/wms/
+systemctl --user daemon-reload && systemctl --user restart wms
+```
+
+配置后访问 `https://example.com/wms/` 即可。`WMS_BASE_PATH` 不设置时默认 `/`，即根路径部署。
 
 #### 启用 HTTPS
 
@@ -393,6 +434,7 @@ systemctl --user edit wms
 | `WMS_HTTPS` | 设为 `1` 时 Cookie 带 Secure | `0` |
 | `WMS_DB_PATH` | 数据库路径 | `<app-dir>/wms.db` |
 | `WMS_BACKUP_DIR` | 备份目录 | `<app-dir>/backup` |
+| `WMS_BASE_PATH` | 子路径部署时的挂载前缀，如 `/wms/` | `/` |
 | `WMS_CORS_ORIGINS` | 跨域白名单（同源部署无需设置） | 空 |
 
 ---

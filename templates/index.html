@@ -4,8 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>物料管理系统</title>
+<!-- 支持子路径部署：由后端注入实际挂载前缀（默认 /），静态资源与 API 均以它为基准 -->
+<base href="{{ base_path }}">
+<script>window.WMS_BASE_PATH = "{{ base_path }}";</script>
 <!-- 静态资源走服务端协商缓存(no-cache + ETag)，部署后立即可见且支持 304，无需手动版本号 -->
-<link rel="stylesheet" href="/static/css/style.css">
+<link rel="stylesheet" href="static/css/style.css">
 
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
@@ -850,6 +853,6 @@
   </div>
 </div>
 
-<script src="/static/js/app.js"></script>
+<script src="static/js/app.js"></script>
 </body>
 </html>

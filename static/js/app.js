@@ -91,6 +91,10 @@ function renderFactorySelect(selectId) {
  * - 网络异常 / 非 JSON 响应统一返回 {code, msg}，不向上抛
  */
 async function api(method, url, body, isForm = false) {
+  // 支持子路径部署（如 /wms/）：页面通过 <base> 或 BASE_PATH 提供前缀
+  if (window.WMS_BASE_PATH && url.startsWith('/')) {
+    url = window.WMS_BASE_PATH.replace(/\/+$/, '') + url;
+  }
   const opts = {
     method,
     credentials: 'include'

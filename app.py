@@ -2,7 +2,7 @@
 
 时间统一使用北京时间(UTC+8)：created_at 显式写入，避免依赖服务器本地时区。
 """
-from flask import Flask, request, jsonify, session, send_from_directory, g
+from flask import Flask, request, jsonify, session, send_from_directory, g, render_template
 from flask_cors import CORS
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.exceptions import HTTPException
@@ -380,9 +380,19 @@ def _throttle_reset(key):
 
 # ===================== 静态文件 =====================
 
+BASE_PATH = os.environ.get('WMS_BASE_PATH', '/').strip() or '/'
+if not BASE_PATH.startswith('/'):
+    BASE_PATH = '/' + BASE_PATH
+if not BASE_PATH.endswith('/'):
+    BASE_PATH += '/'
+
+_app = app  # 便于模板内引用（Flask 默认 Jinja2 已可用 render_template）
+
+
 @app.route('/')
 def index():
-    return send_from_directory(os.path.join(BASE_DIR, 'templates'), 'index.html')
+    # 子路径部署时注入 base href，前端据此拼接 API 与静态资源地址
+    return render_template('index.html', base_path=BASE_PATH)
 
 
 # 使用 Flask 内置 static 路由（自动支持 ETag/Last-Modified 协商缓存），不再重复定义。
