@@ -821,20 +821,23 @@ function deleteFactory(id, name) {
 
 async function initInventoryPage() {
   await loadFactoriesCache();
+  renderFactorySelect('inv-factory');
   renderFactorySelect('inv-edit-factory');
   // 清空查询条件和结果，等待用户手动查询
-  document.getElementById('inv-batch').value = '';
+  const factorySel = document.getElementById('inv-factory');
+  if (factorySel) factorySel.value = '';
   document.getElementById('inv-equipment').value = '';
-  document.getElementById('inv-package').value = '';
+  document.getElementById('inv-list-no').value = '';
   document.getElementById('inv-tbody').innerHTML = '<tr><td colspan="9" class="no-data">请输入查询条件后点击查询</td></tr>';
   document.getElementById('inv-count').textContent = '';
 }
 
 async function queryInventory() {
-  const batch = document.getElementById('inv-batch').value.trim();
+  const factoryEl = document.getElementById('inv-factory');
+  const factory = factoryEl ? factoryEl.value.trim() : '';
   const equipment = document.getElementById('inv-equipment').value.trim();
-  const pkg = document.getElementById('inv-package').value.trim();
-  const params = new URLSearchParams({ batch_no: batch, equipment, package_no: pkg });
+  const listNo = document.getElementById('inv-list-no').value.trim();
+  const params = new URLSearchParams({ factory, equipment, list_no: listNo });
   const res = await api('GET', `/api/inventory?${params}`);
   const tbody = document.getElementById('inv-tbody');
   const countEl = document.getElementById('inv-count');
@@ -865,9 +868,10 @@ async function queryInventory() {
 }
 
 function clearInvQuery() {
-  document.getElementById('inv-batch').value = '';
+  const factorySel = document.getElementById('inv-factory');
+  if (factorySel) factorySel.value = '';
   document.getElementById('inv-equipment').value = '';
-  document.getElementById('inv-package').value = '';
+  document.getElementById('inv-list-no').value = '';
   queryInventory();
 }
 

@@ -781,9 +781,9 @@ def query_inbound():
 @app.route('/api/inventory', methods=['GET'])
 @require_login
 def query_inventory():
-    batch_no = request.args.get('batch_no', '').strip()
+    factory = request.args.get('factory', '').strip()
     equipment = request.args.get('equipment', '').strip()
-    package_no = request.args.get('package_no', '').strip()
+    list_no = request.args.get('list_no', '').strip()
     # NOT EXISTS 配合 idx 优于 NOT IN 子查询
     sql = '''SELECT ii.id, ii.order_no, ii.seq, ii.batch_no, ii.equipment,
                     ii.package_no, ii.list_no, ii.weight,
@@ -791,12 +791,12 @@ def query_inventory():
              FROM inbound_items ii JOIN inbound_orders io ON ii.order_no = io.order_no
              WHERE NOT EXISTS (SELECT 1 FROM outbound_items ob WHERE ob.list_no = ii.list_no)'''
     params = []
-    if batch_no:
-        sql += ' AND ii.batch_no LIKE ?'; params.append(f'%{batch_no}%')
+    if factory:
+        sql += ' AND io.factory = ?'; params.append(factory)
     if equipment:
         sql += ' AND ii.equipment LIKE ?'; params.append(f'%{equipment}%')
-    if package_no:
-        sql += ' AND ii.package_no LIKE ?'; params.append(f'%{package_no}%')
+    if list_no:
+        sql += ' AND ii.list_no LIKE ?'; params.append(f'%{list_no}%')
     sql += ' ORDER BY ii.id DESC LIMIT 500'
     conn = get_db()
     rows = conn.execute(sql, params).fetchall()

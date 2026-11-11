@@ -536,16 +536,18 @@
       <div class="card-title">查询条件</div>
       <div class="form-row">
         <div class="form-group">
-          <label>物料批次</label>
-          <input type="text" class="form-control" id="inv-batch" placeholder="模糊搜索">
+          <label>仓库</label>
+          <select class="form-control" id="inv-factory">
+            <option value="">全部仓库</option>
+          </select>
         </div>
         <div class="form-group">
           <label>设备</label>
-          <input type="text" class="form-control" id="inv-equipment" placeholder="模糊搜索">
+          <input type="text" class="form-control" id="inv-equipment" inputmode="numeric" placeholder="模糊搜索">
         </div>
         <div class="form-group">
-          <label>包号</label>
-          <input type="text" class="form-control" id="inv-package" placeholder="模糊搜索">
+          <label>清单包号</label>
+          <input type="text" class="form-control" id="inv-list-no" placeholder="模糊搜索">
         </div>
       </div>
       <div class="query-actions" style="display:flex;justify-content:flex-end;margin-top:4px;gap:8px;">
