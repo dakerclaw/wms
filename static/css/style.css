@@ -222,11 +222,15 @@ select.form-control { appearance: none; background-image: url("data:image/svg+xm
   border-bottom: 2px solid #dce6f5;
   white-space: nowrap;
 }
+/* 表头文字与输入框内的文字左对齐（12px 单元格内边距 + 1px 边框 + 10px 输入框内边距） */
+.entry-table thead th:nth-child(n+2):nth-child(-n+5) { padding-left: 23px; }
 .entry-table td {
   padding: 8px 12px;
   border-bottom: 1px solid #f0f0f0;
   vertical-align: middle;
 }
+/* 换行锚点 td（手机端强制换行用）：桌面端不参与布局，否则会多出一列导致表头与输入框错位 */
+.entry-table td.row-break { display: none; }
 .entry-table tr:hover td { background: #f8fbff; }
 .entry-table .td-no { color: #888; font-size: 13px; width: 56px; min-width: 56px; text-align: center; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .entry-table input[type="text"],
@@ -463,6 +467,7 @@ select.form-control { appearance: none; background-image: url("data:image/svg+xm
   }
   /* 换行锚点：JS 在"批号"之后插入的空 td，撑满整行宽度，强制后续元素换行 */
   .entry-table td.row-break {
+    display: flex;
     order: 2;
     flex: 0 0 100%;
     height: 0;
